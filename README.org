@@ -24,6 +24,7 @@ tooling for Scheme.  The typical GNU/Linux system ships with it.
 
 For GNU Emacs < 28, enable the [[https://elpa.nongnu.org/][NonGNU Emacs Lisp Package Archive]] in
 your [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Init-File.html][init file]] or [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Easy-Customization.html][customize]] the variable ~package-archives~.
+Likewise, enable the [[https://elpa.nongnu.org/nongnu-devel/][NonGNU-devel ELPA Packages]].
 
 ** Org
 
@@ -42,7 +43,7 @@ document]], especially how to [[https://orgmode.org/org.html#Editing-Source-Code
 [[https://www.nongnu.org/geiser/][Geiser]] is a GNU Emacs package that allows to runs Scheme processes in
 GNU Emacs, and which is used by Org's Babel.  To install it, it is
 enough to install the package [[https://gitlab.com/emacs-geiser/chez/-/blob/master/geiser-chez.el][geiser-chez]] using GNU Emacs' [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Package-Menu.html][package
-menu]].  We need the most recent version.
+menu]].  We need the most recent development version.
 
 ** Paredit
 
