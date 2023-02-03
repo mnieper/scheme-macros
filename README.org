@@ -1,0 +1,68 @@
+#+TITLE: Extending a Language --- Writing Powerful Macros in Scheme
+#+AUTHOR: Marc Nieper-Wißkirchen
+
+* Prerequisites
+
+** Chez Scheme
+
+We need a Scheme implementation.  This tutorial assumes [[https://cisco.github.io/ChezScheme/][Chez Scheme]],
+which is one of the most mature, standard-compliant Scheme
+implementations.  You can get Chez Scheme from its homepage.  On
+Debian-based GNU/Linux system like Ubuntu, it is prepackaged.
+
+** Emacs
+
+We will use [[https://www.gnu.org/software/emacs/][GNU Emacs]] as our development environment, which has great
+tooling for Scheme.  The typical GNU/Linux system ships with it.
+
+For GNU Emacs < 28, enable the [[https://elpa.nongnu.org/][NonGNU Emacs Lisp Package Archive]] in
+your [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Init-File.html][init file]] or [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Easy-Customization.html][customize]] the variable ~package-archives~.
+
+** Org
+
+[[https://orgmode.org/][Org Mode]] is a GNU Emacs major mode that allows to document, edit and
+execute source code.
+
+The current versions of Org packaged with Emacs hide Scheme evaluation
+errors.  This is fixed in the version in Org's git repository, for
+which Org [[https://orgmode.org/org.html#Installation][provides installation instructions]].
+
+Familiarize yourself with how one works with [[https://orgmode.org/org.html#Working-with-Source-Code][source code in an Org
+document]], especially how to [[https://orgmode.org/org.html#Editing-Source-Code][edit]] and [[https://orgmode.org/org.html#Evaluating-Code-Blocks][execute code]].
+
+** Geiser
+
+[[https://www.nongnu.org/geiser/][Geiser]] is a GNU Emacs package that allows to runs Scheme processes in
+GNU Emacs, and which is used by Org's Babel.  To install it, it is
+enough to install the package [[https://gitlab.com/emacs-geiser/chez/-/blob/master/geiser-chez.el][geiser-chez]] using GNU Emacs' [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Package-Menu.html][package
+menu]].  We need the most recent version.
+
+** Paredit
+
+[[https://paredit.org/][Paredit]], a tool for parenthetical editing in Emacs makes working with
+Scheme code a lot more pleasant.  Like Geiser, it can be installed
+through GNU Emacs' package manager.
+
+** Initialization
+
+After the GNU Emacs packages have been installed, we want to customize
+them for our needs.  The following should go into your init file
+unless you want to execute the following code every time you start GNU
+Emacs.
+
+#+BEGIN_SRC emacs-lisp :results none
+  (require 'compile)
+  (autoload 'enable-paredit-mode "paredit" "Turn on pseudo-structural editing of Lisp code" t)
+  (add-hook 'scheme-mode-hook #'enable-paredit-mode)
+  (show-paren-mode t)
+  (setq auto-mode-alist (cons '("\\.ss" . scheme-mode) auto-mode-alist))
+  (setq auto-mode-alist (cons '("\\.sls" . scheme-mode) auto-mode-alist))
+  (setq auto-mode-alist (cons '("\\.sps" . scheme-mode) auto-mode-alist))
+  (add-to-list 'compilation-error-regexp-alist
+               '("^\\(Exception\\|Warning\\).*: .* \\(line \\([0-9]+\\), char \\([0-9]+\\) of \\(.*\\)\\)" 5 3 4 nil 2))
+  (setq geiser-default-implementation 'chez)
+  (org-babel-do-load-languages
+   'org-babel-load-languages
+   '((scheme . t)))
+  (setq org-confirm-babel-evaluate nil)
+#+END_SRC

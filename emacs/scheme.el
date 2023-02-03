@@ -23,7 +23,7 @@
 ;;; Packages
 
 (when (require 'package nil t)
-  (package-initialize))
+   (package-initialize))
 
 (add-to-list 'package-archives '("melpa" . "http://melpa.org/packages/"))
 (add-to-list 'package-archives '("nongnu" . "https://elpa.nongnu.org/nongnu/"))
@@ -31,7 +31,6 @@
 
 (add-to-list 'package-selected-packages 'geiser)
 (add-to-list 'package-selected-packages 'geiser-chez)
-(add-to-list 'package-selected-packages 'org)
 (add-to-list 'package-selected-packages 'paredit)
 
 (package-read-all-archive-contents)
@@ -41,13 +40,7 @@
 ;;; scheme
 
 (autoload 'enable-paredit-mode "paredit" "Turn on pseudo-structural editing of Lisp code" t)
-(add-hook 'emacs-lisp-mode-hook       #'enable-paredit-mode)
-(add-hook 'eval-expression-minibuffer-setup-hook #'enable-paredit-mode)
-(add-hook 'ielm-mode-hook             #'enable-paredit-mode)
-(add-hook 'lisp-mode-hook             #'enable-paredit-mode)
-(add-hook 'lisp-interaction-mode-hook #'enable-paredit-mode)
 (add-hook 'scheme-mode-hook           #'enable-paredit-mode)
-(add-hook 'before-save-hook           #'delete-trailing-whitespace)
 (show-paren-mode t)
 (setq auto-mode-alist (cons '("\\.ss" . scheme-mode) auto-mode-alist))
 (setq auto-mode-alist (cons '("\\.sls" . scheme-mode) auto-mode-alist))
