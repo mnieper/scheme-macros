@@ -1,5 +1,8 @@
 #+TITLE: Extending a Language --- Writing Powerful Macros in Scheme
 #+AUTHOR: Marc Nieper-Wißkirchen
+#+EMAIL: marc@nieper-wisskirchen.de
+
+#+PROPERTY: header-args:scheme :session *session*
 
 * Prerequisites
 
@@ -66,3 +69,20 @@ Emacs.
    '((scheme . t)))
   (setq org-confirm-babel-evaluate nil)
 #+END_SRC
+
+* Introduction
+
+#+BEGIN_SRC scheme :exports both :results
+  (define-syntax incr!
+    (syntax-rules ()
+      ((incr! x)
+       (set! x (+ x 1)))))
+
+  (define x 10)
+  (incr! x)
+
+  x
+#+END_SRC
+
+#+RESULTS:
+11
