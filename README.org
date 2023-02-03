@@ -72,17 +72,20 @@ Emacs.
 
 * Introduction
 
-#+BEGIN_SRC scheme :exports both :results
+#+BEGIN_SRC scheme :exports :results silent
   (define-syntax incr!
     (syntax-rules ()
       ((incr! x)
        (set! x (+ x 1)))))
+#+END_SRC
 
+#+BEGIN_SRC scheme :exports both :wrap example
   (define x 10)
   (incr! x)
-
   x
 #+END_SRC
 
 #+RESULTS:
+#+begin_example
 11
+#+end_example
