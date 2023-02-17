@@ -4,6 +4,8 @@
 
 #+PROPERTY: header-args:scheme :session *session*
 
+* TODO Preface
+
 * Prerequisites
 
 ** Chez Scheme
@@ -70,7 +72,11 @@ Emacs.
   (setq org-confirm-babel-evaluate nil)
 #+END_SRC
 
-* Introduction
+* TODO The Scheme programming language
+
+* TODO Some simple macros
+
+** TODO Incrementing a variable
 
 #+BEGIN_SRC scheme :exports :results silent
   (define-syntax incr!
@@ -89,3 +95,37 @@ Emacs.
 #+begin_example
 11
 #+end_example
+
+** TODO A tracing ~let~
+
+** TODO Accessing vector locations through variables
+
+* TODO Syntax objects
+
+** TODO Identifiers
+
+** TODO Deconstructing syntax objects
+
+** TODO Constructing syntax objects
+
+* TODO Syntax-case macros
+
+** TODO A fluid ~let~
+
+** TODO Macro-generating macros
+
+* TODO Breaking hygiene
+
+** TODO A pitfall
+
+* TODO Phasing
+
+* TODO Extensions
+
+** TODO Syntax parameters
+
+** TODO Identifier properties
+
+* TODO Examples
+
+** TODO Implementing a DSL
