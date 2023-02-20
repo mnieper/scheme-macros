@@ -4,7 +4,33 @@
 
 #+PROPERTY: header-args:scheme :session *session*
 
-* TODO Preface
+* Preface
+
+This document is an introduction to writing powerful macros in Scheme.
+It was initially written on the occasion of a tutorial I give at the
+[[https://bobkonf.de/2023/en/][BOB2023 Konferenz]] in Berlin on 17 March 2023.
+
+The macro facility, especially its built-in /hygiene/, is one of the
+fundamental pillars of the Scheme programming language.  While more
+complicated than the simple token-replacing macros of other languages
+like C, Scheme macros can be written in a way that make them robust
+and so that the abstractions they offer seamless blend into the
+language and cannot be distinguished from syntactic forms built into
+the language.  It is often felt that this expressiveness makes writing
+Scheme macros more complicated (even something of a black art) than
+writing C or Common Lisp macros, for example.  One goal of this
+tutorial is to convince the audience otherwise.
+
+While the Scheme macro facility has always been avant-garde (and this
+is one of the reasons why Scheme was chosen as the implementation
+language for this tutorial), a lot of what is said here also applies
+to languages that provide corresponding features.  It is also a appeal
+to language designers that languages should include a macro facility
+as Scheme does, as this allows for small language cores and enables
+the user to provide their own syntactic abstractions.
+
+The document can both be read as is or used interactively in an Emacs
+session.  In the following section, a possible setup is described.
 
 * Prerequisites
 
@@ -72,7 +98,35 @@ Emacs.
   (setq org-confirm-babel-evaluate nil)
 #+END_SRC
 
-* TODO The Scheme programming language
+* The Scheme programming language
+
+Scheme is programming language of the Lisp family.  Its defining
+properties are its uniform parenthesized syntax (inherited from Lisp),
+first-class procedures and continuations, lexical scoping, dynamic
+typing, proper tail calls and hygienic macros.  It is primarly a
+functional programming language but allows many other programming
+paradigms.
+
+The Scheme programming language was developed in the 1970s by Guy
+L. Steele and Gerald Jay Sussman.  Since then it has been refined and
+further developed through a series of de facto standards called the
+Revised^{/n/} Report(s) on the Algorithmic Language Scheme (R/n/RS).
+The two current standards are R6RS (2007) and R7RS-small (2013).
+Despite the versioning and the timeline, R6RS is the more detailed,
+more advanced and more modern standard[fn:1].
+
+In this tutorial, we work with the macro facility of R6RS, which is
+far more powerful than the one of R7RS-small, and also discuss some
+proposed or implemented extensions.  Such extensions to the Scheme
+programming language are often proposed, discussed and implemented
+using the [[https://srfi.schemers.org/][Scheme Requests for Implementation]] process, where everyone
+can submit a /SRFI/ extending the Scheme programming language.
+
+For practical programming, one needs, of course, an implementation.
+Scheme is possibly the programming language with the highest number of
+implementations.  The R6RS language has some very high-quality
+implementations, including [[https://cisco.github.io/ChezScheme/][Chez Scheme]], [[https://www.gnu.org/software/guile/][GNU Guile]], [[https://scheme.fail/][Loko Scheme]], and [[https://racket-lang.org/][Racket]],
+so for any application area, there will be a suitable Scheme system.
 
 * TODO Some simple macros
 
@@ -129,3 +183,12 @@ Emacs.
 * TODO Examples
 
 ** TODO Implementing a DSL
+
+* Footnotes
+
+[fn:1] This may change when the R7RS-large standardization effort is
+finished.  Both, R6RS and R7RS-small, are successors (and extensions)
+to R5RS (1998), but R7RS-small was never meant to be seen in isolation
+as a successor to R6RS.  Time will tell whether the R7RS large
+language will be able to replace R6RS when it is finally done.  It is
+planned to include the R6RS macro facility in R7RS-large.
