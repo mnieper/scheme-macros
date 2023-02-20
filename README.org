@@ -29,6 +29,10 @@ to language designers that languages should include a macro facility
 as Scheme does, as this allows for small language cores and enables
 the user to provide their own syntactic abstractions.
 
+Another reason why the Scheme language is used in this tutorial is
+that it has an exceptionally clear semantics, is a compact language,
+and is easy to learn.
+
 The document can both be read as is or used interactively in an Emacs
 session.  In the following section, a possible setup is described.
 
@@ -130,7 +134,94 @@ so for any application area, there will be a suitable Scheme system.
 
 * TODO Some simple macros
 
-** TODO Incrementing a variable
+Let us call a /combination/ an expression in Scheme of the form
+
+#+BEGIN_SRC scheme :eval no
+  (operator operand ...)
+#+END_SRC
+
+An example is given by the following expression evaluating to the answer of life:
+
+#+BEGIN_SRC scheme :exports both :wrap example
+  (* 21 2)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+42
+#+end_example
+
+Such a combination is usually evaluated by evaluating the operator and
+the operands in some unspecific order and by then calling the
+procedure resulting from the operator evaluation with arguments
+resulting from the operand evaluations.
+
+Scheme, however, also possesses special forms, which do not follow
+this evaluation strategy.  An example is given by the conditional ~if~.
+#+BEGIN_SRC scheme :exports both :wrap example
+  (if (number? 2)
+      'ok
+      (/ 1 0))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+ok
+#+end_example
+
+If the conditional were a normal combination, the operands, and ~(/ 1
+0)~ in particular, would have been evaluated first (and
+unconditionally).  Scheme recognizes special forms through the
+operator in first position, namely if it is a keyword (a special type
+of identifier).  The Scheme macro facility allows the programmer to
+define their own keywords.
+
+** Incrementing a variable
+
+Let us ignore for a moment that mutation is frowned upon in functional
+programming and let us assume that we have to frequently increase the
+value of variables in our program.  Given a variable ~x~, this is done
+in Scheme through the following expression:
+#+BEGIN_SRC scheme :eval no
+  (set! x (+ x 1))
+#+END_SRC
+That the variable ~x~ is repeated in this expression is unpleasant
+(and may be considered a violation of the DRY principle), so we want
+an operator akin to C's pre/post-increment operator.  Unfortunately,
+Scheme does not provide such an operator, but, fortunately, it doesn't
+have to because we can build one ourself.
+
+Our first attempt could be to write a procedure (the primary means of
+abstraction in functional programming languages):
+#+BEGIN_SRC scheme :results silent
+  (define incr!
+    (lambda (x)
+      (set! x (+ x 1))))
+#+END_SRC
+
+This attempt, however, is failed:
+#+BEGIN_SRC scheme :exports both :wrap example
+  (define x 1)
+  (incr! x)
+  x
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+1
+#+end_example
+
+The reason that it doesn't work --- the variable's value is still 1
+and not 2 --- is that ~(incr! x)~ is a normal combination as
+introduced earlier.  As the arguments are evaluated first and the
+procedure is called with their values, in this example, ~incr!~ is
+called with the argument ~1~.  This is then bound to a new variable
+~x~ locally to ~incr!~.  It is this variable, which is increased by 1
+and not the top-level variable.
+
+The solution is, of course, to define ~incr!~ not as a procedure[fn:2]
+but as a keyword.  In the Scheme programming language, the
+~define-syntax~ keyword can be used for it:
 
 #+BEGIN_SRC scheme :exports :results silent
   (define-syntax incr!
@@ -139,10 +230,24 @@ so for any application area, there will be a suitable Scheme system.
        (set! x (+ x 1)))))
 #+END_SRC
 
+This definition says that ~incr!~ is defined to be a new keyword,
+implemented as a macro.  The ~syntax-rules~ line shall be viewed as
+boilerplate for the moment (and we will come back to it later).
+Important are the next two lines.  The form ~(incr! x)~ is a pattern
+saying that the macro matches against a use of the form ~(keyword
+form)~ (where ~keyword~ is necessarily ~incr!~).  When the macro is
+used, the pattern variable ~x~ is bound to the ~form~.  The form
+~(set! x (+ x 1))~ is a template.  When the macro is used, the pattern
+variables in the template are replaced with the forms they are bound
+to and the substituted template is then used in place of the macro.
+
+In the following example, ~(incr! y)~ is effectively substituted by
+~(set! y (+ y 1))~, so we have achieved what we wanted[fn:3]:
+
 #+BEGIN_SRC scheme :exports both :wrap example
-  (define x 10)
-  (incr! x)
-  x
+  (define y 10)
+  (incr! y)
+  y
 #+END_SRC
 
 #+RESULTS:
@@ -186,7 +291,14 @@ so for any application area, there will be a suitable Scheme system.
 
 * Footnotes
 
-[fn:1] This may change when the R7RS-large standardization effort is
+[fn:3]When interactively testing our procedures and syntax (keywords),
+one has to be careful that we have given both the procedure and the
+keyword the same name.  Evaluating one of the definitions will
+overwrite the meaning of the other one.
+
+[fn:2]More precicely: as a variable holding a procedure value.
+
+[fn:1]This may change when the R7RS-large standardization effort is
 finished.  Both, R6RS and R7RS-small, are successors (and extensions)
 to R5RS (1998), but R7RS-small was never meant to be seen in isolation
 as a successor to R6RS.  Time will tell whether the R7RS large
