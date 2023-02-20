@@ -259,7 +259,198 @@ As a side note, we see from the discussion that ~set!~ is another
 keyword (like ~if~, it cannot be a procedure for the same reasons why
 our attempt to write ~incr!~ as a procedure doesn't work).
 
+As any other identifier in Scheme, the identifier ~set!~ can also be
+rebound as in the following example:
+
+#+BEGIN_SRC scheme :exports both :wrap example
+  (let ([set! (lambda (x y) (+ x y))])
+    (define x 1)
+    (set! x 2))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+3
+#+end_example
+
+In the body of the ~let~ form, ~set!~ has lost its usual meaning and
+is bound to a procedure adding its two arguments.  It is most
+interesting to see what happens when we use our ~incr!~ macro, which
+refers to ~set!~, in the body of the ~let~ form:
+
+#+BEGIN_SRC scheme :exports both :wrap example
+  (let ([set! (lambda (x y) (/ 1 0))])
+    (define x 1)
+    (incr! x)
+    x)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+2
+#+end_example
+
+This example yields the correct result ~2~, although calling ~set!~
+within the ~let~ body would raise an exception.  The reason for this
+is the already mentioned hygiene of Scheme macros.  The identifier
+~set!~ in the output of the ~incr!~ macro didn't occur in its input
+but came from the macro definition.  Scheme macro hygiene now ensures
+that it still refers to the lexical binding it had where it occured in
+the program source.  Note that the C preprocessor --- as an example
+for a very simple, if not primitive macro facility --- wouldn't have
+ensured it.  Whether a C macro works correctly or not often depends on
+the lexical environment of the macro use site.
+
+We say that hygienic Scheme macros are referentially transparent.
+This is already known from procedures in functional programming
+languages and lexical scoping:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (define f
+    (let ([x 1])
+      (lambda () x)))
+
+  (list (f)
+        (let ([x 2])
+          (f)))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(1 1)
+#+end_example
+
+Wherever the procedure ~f~ is called, it always evaluates to ~1~.
+
+We finish this subsection with another example of hygiene:
+
+#+BEGIN_SRC scheme :exports both :wrap example
+  (let ([set! 2])
+    (incr! set!)
+    set!)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+3
+#+end_example
+
+The result, which is the increment of the original value of the
+variable ~set!~ by one, can again be explained by hygiene and by
+distinguishing the identifier ~set!~ that appears in the macro use and
+the same-named identifier ~set!~ appearing in the macro source.
+Without distinguishing both, the macro use ~(incr! set!)~ is
+transcribed to ~(set! set! (+ set! 1))~.  In this transcription, the
+first ~set!~ originates from the macro transformer and thus still
+refers to the lexical binding it had at that place.  The other two
+occurrences of ~set!~ are copies from the macro input and thus refer
+to the lexical binding of ~set!~ as a let-bound variable.
+
+*** TODO Demonstrate macro that expands into itself.
+
 ** TODO A tracing ~let~
+
+Simple loops are often written using the named ~let~ form as in the following example:
+#+BEGIN_SRC scheme :results silent
+  (define fact
+    (lambda (n)
+      (let f ([n n] [a 1])
+        (if (zero? n)
+            a
+            (f (- n 1) (* a n))))))
+#+END_SRC
+
+In order to facilitate debugging, let us define a version of the named
+~let~ form that prints the arguments with which the loop recursion is
+entered and with which it is exited[fn:5].  As ~let~ is a special
+form, this has to be a special form as well, so let us write our second macro:
+
+#+BEGIN_SRC scheme :results silent
+  ;; A form of a named let that prints information about each recursive
+  ;; call.
+  (define-syntax trace-let
+    (syntax-rules ()
+      [(trace-let name ([var expr] ...) body1 ... body2)
+       (let f ([depth 0] [var expr] ...)
+         (define name
+           (lambda (var ...)
+             (f (+ depth 1) var ...)))
+         (indent depth)
+         (display "(")
+         (display 'name)
+         (begin
+           (display " ")
+           (display var))
+         ...
+         (display ")")
+         (newline)
+         (call-with-values
+             (lambda ()
+               body1 ... body2)
+           (lambda val*
+             (indent depth)
+             (fold-left
+              (lambda (sep val)
+                (display sep)
+                (display val)
+                " ")
+              "" val*)
+             (newline)
+             (apply values val*))))]))
+
+  ;; Helper procedure referenced by the macro output of the macro above.
+  (define indent
+    (let ([pattern "| "])
+      (lambda (depth)
+        (do ([i 0 (+ i 1)])
+            ((> i depth))
+          (display (string-ref pattern (mod i 2)))))))
+#+END_SRC
+
+In this macro, the pattern is given by ~(trace-let name ([var expr]
+...) body1 ... body2)~, while the template makes up the bulk of the
+macro.  Already in the pattern, we see a new syntax, the ellipsis
+~...~.  It means that the subpattern preceding it may appear repeated
+zero or more times in the input.  When such a subpattern is matched,
+the contained pattern variables represent lists of forms.
+
+In the template, the ellipsis means to repeat the preceding
+subtemplate as many times as the pattern variables contained in it
+represent forms.  For this to work, every such subtemplate has to
+contain at least one pattern variable, obviously, and all pattern
+variables contained in it have to represent lists of forms of the same
+length.
+
+Note the occurrence of ~begin~ in the macro.  Normally, in a procedure
+body, ~(begin expression ...)~ is equivalent to the list of
+~expressions~, here, however, we have to use it.  The reason is that
+following ellipsis refers the immediately preceding subtemplate, so it
+is crucial that the two display commands (which we both want to
+repeated once per variable) appear in a single form.
+
+When we run the following test, we see the given result printed.
+
+#+BEGIN_SRC scheme :results output :wrap example
+  (define fact
+      (lambda (n)
+        (trace-let f ([n n])
+          (if (zero? n)
+              1
+              (* (f (- n 1)) n)))))
+  (fact 3)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+|(f 3)
+| (f 2)
+| |(f 1)
+| | (f 0)
+| | 1
+| |1
+| 2
+|6
+#+end_example
 
 ** TODO Accessing vector locations through variables
 
@@ -294,6 +485,10 @@ our attempt to write ~incr!~ as a procedure doesn't work).
 ** TODO Implementing a DSL
 
 * Footnotes
+
+[fn:5]Such a form is predefined in Chez Scheme, but is not part of the
+Scheme standard.  In fact, Chez Scheme's version properly handles tail
+calls, which our simple version doesn't.
 [fn:4]While Scheme does not forbid mutation (like ML but unlike
 Haskell), the pitfalls of impure code are well-understood.  Therefore,
 the names of Scheme procedures and syntax that modifies locations in
