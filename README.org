@@ -192,7 +192,7 @@ Scheme does not provide such an operator, but, fortunately, it doesn't
 have to because we can build one ourself.
 
 Our first attempt could be to write a procedure (the primary means of
-abstraction in functional programming languages):
+abstraction in functional programming languages)[fn:4]:
 #+BEGIN_SRC scheme :results silent
   (define incr!
     (lambda (x)
@@ -255,6 +255,10 @@ In the following example, ~(incr! y)~ is effectively substituted by
 11
 #+end_example
 
+As a side note, we see from the discussion that ~set!~ is another
+keyword (like ~if~, it cannot be a procedure for the same reasons why
+our attempt to write ~incr!~ as a procedure doesn't work).
+
 ** TODO A tracing ~let~
 
 ** TODO Accessing vector locations through variables
@@ -290,6 +294,11 @@ In the following example, ~(incr! y)~ is effectively substituted by
 ** TODO Implementing a DSL
 
 * Footnotes
+[fn:4]While Scheme does not forbid mutation (like ML but unlike
+Haskell), the pitfalls of impure code are well-understood.  Therefore,
+the names of Scheme procedures and syntax that modifies locations in
+the store (the Scheme model of the computer's memory) end with a ~!~
+by convention.
 
 [fn:3]When interactively testing our procedures and syntax (keywords),
 one has to be careful that we have given both the procedure and the
