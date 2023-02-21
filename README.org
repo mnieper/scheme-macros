@@ -125,6 +125,8 @@ proposed or implemented extensions.  Such extensions to the Scheme
 programming language are often proposed, discussed and implemented
 using the [[https://srfi.schemers.org/][Scheme Requests for Implementation]] process, where everyone
 can submit a /SRFI/ extending the Scheme programming language.
+Whenever we speak of the /Scheme/ language in this text, we default to
+the R6RS dialect.
 
 For practical programming, one needs, of course, an implementation.
 Scheme is possibly the programming language with the highest number of
@@ -650,9 +652,360 @@ variable would be accessed.
 
 * TODO Syntax objects
 
+The Scheme reports define hygiene and referential transparency for
+macros as follows:
+
+- If a macro transformer inserts a binding for an identifier (variable
+  or keyword) not appearing in the macro use, the identifier is in
+  effect rename throughout its scope to avoid conflicts with other
+  identifiers.
+
+- If a macro transformer inserts a free reference to an identifier,
+  the reference refers to the binding that was visible where the
+  transformer was specified, regardless of any local bindings that may
+  surround the use of the macro.
+
+The examples of the previous section make it hopefully a bit clear
+what is meant by these two points.  Nevertheless, one may think that
+there still must be some magic at work and that it will be impossible
+to prove anything about these macros.  The purpose of this section is
+to disassemble everything and to explain what is going on under the
+hood.
+
 ** TODO Identifiers
 
+The Lisp languages, and thus Scheme as well, are homoiconic
+programming languages, which means that if the program's internal
+representation is a datum of the language.  In first approximation,
+the internal representation of a Scheme expression (as of a Scheme
+program) is a Scheme datum value.  For example, the program
+(expression)
+
+#+BEGIN_SRC scheme :eval no
+  (let ([x 1])
+    (+ x 2))
+#+END_SRC
+
+is represented by a list whose first element is the symbol ~let~,
+whose second element is a list of a list with two elements and whose
+third element is a list of the three data ~+~, ~x~, and ~2~.
+
+Due to existence of hygienic macros we have to amend this traditional
+picture.  Consider the following example.
+
+#+BEGIN_SRC scheme :eval no
+  (let ([set! 10])
+    (incr! set!)
+    set!)
+#+END_SRC
+
+To evaluate the ~let~ expression, the macro use of ~incr!~ has to be
+expanded first.  After the expansion, the expression would look like
+
+#+BEGIN_SRC scheme :eval no
+  (let ([set! 10])
+    (set! set! (+ set! 1))
+    set!)
+#+END_SRC
+
+if Scheme expressions were represented by Scheme datum values and
+within, identifiers were represented by symbols.  It is obvious that
+this cannot be how the Scheme expander works because there would be no
+way to tell which copy of the symbol ~set!~ refers to which binding.
+The point is that identifiers cannot be represented by symbols, which
+only have a symbolic name.  Instead, to an /identifier/ both a
+symbolic name and a lexical context are associated.  When the binding
+of an identifier is looked up, it is looked up in the lexical context
+associated with it.
+
+In Scheme, symbols are first-class values.  The can be created using
+the syntax ~(quote name)~, which can be abbreviated to ~'name~:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  'red
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+red
+#+end_example
+
+The same is true for identifiers.  They are created just like symbols
+but use the syntax ~(syntax identifier)~, which can be abbreviated to
+~#'identifier~, instead:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  #'x
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+#<syntax x>
+#+end_example
+
+(The format of the output, ~#<syntax x>~, is implementation-specific,
+because identifiers are not Scheme datum values and thus have no
+standardized or faithful written representation.)
+
+Evaluating of the form ~(syntax x)~ (or ~#'x~) means the following for
+the Scheme system: construct and return an identifier with the
+symbolic name ~x~ and with the lexical context at the place of the ~x~
+appearing in the ~syntax~ form.  We have to be aware of that the term
+~identifier~ can be used in two (slightly) different contexts: When we
+refer to ~set!~ as an identifier in the example above, we speak about
+a token being part of the code.  When we refer to the expression ~#'x~
+evaluating to an identifier, we speak about a value of the language.
+The expression ~#'x~ contains an identifier in the first sense
+(speaking about the language) and evaluates to an identifier (as a
+value of the language).
+
+The procedure ~syntax->datum~ can be used to convert an identifier to
+a symbol, namely its underlying symbolic name:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (syntax->datum #'x)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+x
+#+end_example
+
+There are no standard procedures that allow us to look up the binding
+of an identifier, but we can compare identifiers.  Scheme defines two
+equivalence relations, realized by the predicates ~bound-identifier=?~
+and ~free-identifier=?~.  Two identifiers are "~bound-identifier=?~"
+if they are interchangeable when they appear bound in the output of a
+macro.  Two identifiers are "~free-identifier=?~" if they are
+interchangeable when they appear free in the output of a macro.
+Neither equivalence implies the other.  It will become clearer in the
+course of this tutorial what this means, but some experiments will
+already give some understanding:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (list (bound-identifier=? #'x #'x) (bound-identifier=? #'x #'y))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(#t #f)
+#+end_example
+
+The two identifiers to which the two evaluations of ~#'x~ in the first
+argument to ~list~ evaluate are therefore "~bound-identifier=?~" while
+the differently named identifiers ~#'x~ and ~#'y~ (more precisely: the
+identifiers returned by these expressions) are not.  It is tempting to
+say that the two (or three) instances of ~#'x~ evaluate to the /same/
+identifier, but for this to make sense, some equivalence relation
+would have had to be fixed earlier.
+
+Let us now consider two simple examples for ~free-identifier=?~:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (let ([x 1])
+    (free-identifier=? #'x #'x))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+#t
+#+end_example
+
+If the identifiers to both instances of ~#'x~ evaluate were inserted
+in the code as free identifiers they both would refer to the variable
+binding of the identifier ~x~ introduced by ~let~.
+
+The second example is a bit more interesting:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (let ([x 1]
+        [y 1])
+    (free-identifier=? #'x #'y))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+#f
+#+end_example
+
+The answer is ~#f~ (for false) because although the values of the two
+variables ~x~ and ~y~ are both initialized to ~1~ they are bound to
+different locations in the store (which can be exhibited by mutating
+one of the two variables.
+
+So far, in all examples ~bound-identifier=?~ seems to give the same
+result as ~free-identifier=?~.  That this is not true is shown in the
+next example.
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (let ([x 1])
+    (define outer-x #'x)
+    (let ([x 2])
+      (define inner-x #'x)
+      (list (bound-identifier=? outer-x inner-x)
+            (free-identifier=? outer-x inner-x))))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(#t #f)
+#+end_example
+
+Inserting ~inner-x~ as a free identifier would not be equivalent to
+inserting ~outer-x~ because the former would refer to the binding of
+the variable with value ~2~ and the latter to the binding of the
+variable with value ~1~.  Thus identifiers that are
+"~bound-identifier=?~" are not necessarily "~free-identifier~".  We
+hope that the connection of ~free-identifier=?~ to the second hygiene
+condition, the one about inserting free references to an identifier,
+is apparent.
+
+Again so far, it seems that identifiers are "~bound-identifier=?~" if
+and only if they have the same symbolic name.  One implication is
+correct, namely that identifiers that are interchangeable as bound identifiers
+must have the same symbolic name, but the other implication is not.  To show this, we have to employ a macro:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (let ([x 1])
+    (let-syntax
+        ([outer-x (identifier-syntax #'x)])
+      (define inner-x #'x)
+      (list (bound-identifier=? outer-x inner-x)
+            (free-identifier=? outer-x inner-x))))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(#f #t)
+#+end_example
+
+Two remarks about the example code are in order before we discuss the
+result.  The binding form ~let-syntax~ is to ~let~ as ~define-syntax~
+is to ~define~; in other words, it allows us to locally bind keywords
+to macro (transformers).  Furthermore, we employ a short form of
+~identifier-syntax~ here, which defines no ~set!~ semantics but just
+replaces an occurrence of the keyword ~outer-x~ with ~#'x~.
+
+Both the identifier ~x~ in the definition of the macro ~outer-x~ and
+the identifier ~x~ in the definition of the variable ~inner-x~ refer
+to the binding of ~x~ introduced by the outer ~let~, which explains
+that the values of ~outer-x~ and ~inner-x~ are "~free-identifier=?~".
+But they are not "~bound-identifier=?~", so this example shows that
+identifiers that "~free-identifier=?~" need not necessarily be
+"~bound-identifier=?~".
+
+The reason why they cannot be "~bound-identifier=?~" is that the first
+hygiene condition about inserting bindings for an identifier would be
+violated otherwise.  Consider the following example:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (let-syntax
+      ([add1
+        (syntax-rules ()
+          [(add1 y)
+           (let ([x 1])
+             (+ x y))])])
+    (let ([x 2])
+      (add1 x)))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+3
+#+end_example
+
+The identifier ~x~ appearing in the macro template is inserted as a
+bound identifier in the macro output and thus is in effect renamed to
+avoid conflict with the identifier ~x~ appearing in the macro use.
+Renaming means that the two identifiers named ~x~ cannot be
+"~bound-identifier=?~" because they would otherwise be interchangeable
+as bound identifiers.
+
+Scheme implements this hygiene condition by assigning to identifiers
+besides their symbolic name and their lexical context another
+property, namely their historic context (or just history)[fn:7].  The
+history of an identifier is the information when the identifier was
+first introduced in the program.  All identifiers in the program
+source have the same history --- they were already there when the
+program was started.  An identifier introduced by a macro
+transformation (as part of its output) has a different history than
+identifiers that were already present in the program source.
+Identifiers introduced by different macro transformations have
+different histories and all identifiers introduced by the same macro
+transformation have the same history.
+
+Let us take another view at this example:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (let ([x 1])
+    (let-syntax
+        ([outer-x (identifier-syntax #'x)])
+      (define inner-x #'x)
+      (list (bound-identifier=? outer-x inner-x)
+            (free-identifier=? outer-x inner-x))))
+#+END_SRC
+
+The identifier ~x~ appears three times in the source.  All three
+identifiers have the same history.  When the macro ~outer-x~ is
+expanded, the identifier ~x~ is introduced in the macro output (as
+part of the expression ~#'x~) and this particular identifier was not
+part of the macro input, so the introduced identifier ~x~ has a
+different history than the identifier to which ~inner-x~ is bound.
+
+We are now in a situation to give alternative definitions for
+~bound-identifier=?~ and ~free-identifier=?~: Two identifiers are
+"~bound-identifier=?~" if they have the same symbolic name and the
+same history.  Two identifiers are "~free-identifier=?~" if they refer
+to the same binding in their respective lexical contexts.  (An unbound
+identifier is, by definition, "~free-identifier=?~" to another
+identifier if the other identifier is also unbound and has the same
+symbolic name.)
+
+Scheme also allows to fudge identifiers.  The procedure
+~datum->syntax~ can turn a symbol into an identifier with that
+symbolic name.  For that, the user has to provide a lexical context
+and a history.  This is done by giving a "template" identifier from
+which the context is taken.
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (let ([x 1])
+    (define outer-x #'x)
+    (let ([x 2])
+      (define outer (datum->syntax outer-x 'x))
+      (list (bound-identifier=? outer-x outer)
+            (free-identifier=? outer-x outer))))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(#t #t)
+#+end_example
+
+In this example, the identifier ~outer~ is an identifier with the
+symbolic name ~x~ and with the context as if it was introduced where
+~x~ appears in the definition of ~outer-x~.
+
+In the following example, the fudged identifier with the symbolic name
+~y~ has the same history as the identifier ~x~ appearing the macro use
+of ~as-y~, and thus the same history as the identifier ~y~ appearing
+in the call to ~bound-identifier=?~.
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (let-syntax
+      ([as-y
+        (syntax-rules ()
+          [(as-y x) (datum->syntax #'x 'y)])])
+    (bound-identifier=? #'y (as-y x)))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+#t
+#+end_example
+
 ** TODO Deconstructing syntax objects
+
+*** TODO Describe syntax objects.  Tell about wrapped and unwrapped ones.
 
 ** TODO Constructing syntax objects
 
@@ -679,11 +1032,16 @@ variable would be accessed.
 ** TODO Implementing a DSL
 
 * Footnotes
+
+[fn:7]The term "history" of an identifier is not an established one
+but was invented for this presentation.
+
 [fn:6]Note that this cannot be done with C preprocessor macros.
 
 [fn:5]Such a form is predefined in Chez Scheme, but is not part of the
 Scheme standard.  In fact, Chez Scheme's version properly handles tail
 calls, which our simple version doesn't.
+
 [fn:4]While Scheme does not forbid mutation (like ML but unlike
 Haskell), the pitfalls of impure code are well-understood.  Therefore,
 the names of Scheme procedures and syntax that modifies locations in
@@ -704,4 +1062,4 @@ as a successor to R6RS.  Time will tell whether the R7RS large
 language will be able to replace R6RS when it is finally done.  It is
 planned to include the R6RS macro facility in R7RS-large.
 
-#  LocalWords:  preprocessor expander
+#  LocalWords:  preprocessor expander homoiconic
