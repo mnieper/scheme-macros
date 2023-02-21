@@ -585,13 +585,45 @@ system comes to our rescue:
 
 #+RESULTS:
 #+begin_example
-(5 #(1 5 3))
+#(1 6 3)
 #+end_example
 
 This macro isn't written with ~syntax-rules~ but uses
 ~identifier-syntax~.  This is used to declare a keyword, ~v1~ in our
 case, that is transcribed differently, depending on whether it appears
 in the form ~v1~ or in the form ~(set! v1 expr)~ in the source code.
+
+To access the zeroth or the second element of the vector ~v~, we could
+define identifier macros ~v0~ and ~v2~ similar to ~v1~ but this would
+mean mostly duplicating code and violating the DRY principle.  A
+better approach is to use the Scheme macro system once more.  We
+define a macro that, when used, defines a customized macro[fn:6]:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax define-vector-reference
+    (syntax-rules ()
+      [(define-vector-reference var vec-expr idx-expr)
+       (begin
+         (define vec vec-expr)
+         (define idx idx-expr)
+         (define-syntax var
+           (identifier-syntax
+            [var (vector-ref vec idx)]
+            [(set! var expr) (vector-set! vec idx expr)])))]))
+#+END_SRC
+
+We can now use this macro as follows:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (define-vector-reference initial-element v 0)
+  (incr! initial-element)
+  v
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+#(2 6 3)
+#+end_example
 
 * TODO Syntax objects
 
@@ -624,6 +656,7 @@ in the form ~v1~ or in the form ~(set! v1 expr)~ in the source code.
 ** TODO Implementing a DSL
 
 * Footnotes
+[fn:6]Note that this cannot be done with C preprocessor macros.
 
 [fn:5]Such a form is predefined in Chez Scheme, but is not part of the
 Scheme standard.  In fact, Chez Scheme's version properly handles tail
@@ -647,3 +680,5 @@ to R5RS (1998), but R7RS-small was never meant to be seen in isolation
 as a successor to R6RS.  Time will tell whether the R7RS large
 language will be able to replace R6RS when it is finally done.  It is
 planned to include the R6RS macro facility in R7RS-large.
+
+#  LocalWords:  preprocessor
