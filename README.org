@@ -430,13 +430,13 @@ repeated once per variable) appear in a single form.
 
 When we run the following test, we see the given result printed.
 
-#+BEGIN_SRC scheme :results output :wrap example
+#+BEGIN_SRC scheme :exports both :results output :wrap example
   (define fact
-      (lambda (n)
-        (trace-let f ([n n])
-          (if (zero? n)
-              1
-              (* (f (- n 1)) n)))))
+    (lambda (n)
+      (trace-let f ([n n])
+        (if (zero? n)
+            1
+            (* (f (- n 1)) n)))))
   (fact 3)
 #+END_SRC
 
@@ -450,6 +450,85 @@ When we run the following test, we see the given result printed.
 | |1
 | 2
 |6
+#+end_example
+
+The ellipsis can also be used to turn our ~incr!~ macro into one that
+accepts more than one variable to increment:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax incr!
+    (syntax-rules ()
+      ((incr! x ...)
+       (begin
+         (set! x (+ x 1))
+         ...))))
+#+END_SRC
+
+Let us briefly test our new extended macro:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (define x 10)
+  (define y 20)
+  (incr! x y)
+  (list x y)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(11 21)
+#+end_example
+
+The role of ~begin~ in the macro definition of the extended ~incr!~
+differs from the role in our previous use of ~begin~.  Here it is used
+to solve the problem that the template that prescribes the macro
+output has to be a single form.
+
+One can also write the multi-variable ~incr!~ macro without the
+ellipsis by letting the macro expand into itself.  This is not
+necessarily how one would do it, but here it serves as a demonstration
+for further macro techniques:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax incr!
+    (syntax-rules ()
+      ((incr!)
+       (values))
+      ((incr! x . x*)
+       (begin
+         (set! x (+ x 1))
+         (incr! . x*)))))
+#+END_SRC
+
+First of all, this is our first macro with two transcription /rules/,
+where each rule consists of a pattern and of a template.  The pattern
+of the first rule is ~(incr!)~, the pattern of the second rule is
+~(incr! x . x*)~.  Scheme's macro expander tries to match the macro
+input against the patterns in the order in which the patterns appear
+in the ~syntax-rules~ form.
+
+The second new thing is a a pattern of the form ~(incr! x . x*)~,
+which matches an (improper) list of at least two elements, the first
+being the macro keyword and the second one being bound to the pattern
+variable ~x~.  The rest arguments are bound as an (improper) list to
+the pattern variable ~x*~.
+
+Finally, this example demonstrates a recursive macro, that is a macro
+that transforms the input into an instance of itself.  As long as the
+output of a macro use involves a new macro use (possibly with the same
+keyword), the Scheme expander continues with transcribing the macro.
+
+Let us not forget to test the new version of the macro:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (define x 100)
+  (define y 200)
+  (incr! x y)
+  (list x y)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(101 201)
 #+end_example
 
 ** TODO Accessing vector locations through variables
