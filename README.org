@@ -533,6 +533,66 @@ Let us not forget to test the new version of the macro:
 
 ** TODO Accessing vector locations through variables
 
+A /vector/ in Scheme is a collection of locations in the store that
+can be linearly addressed.  A new vector can be allocated with the
+~vector~ procedure:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (define v (vector 1 2 3))
+  v
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+#(1 2 3)
+#+end_example
+
+Vector elements can be retrieved using ~vector-ref~ and mutated using ~vector-set!~:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (vector-ref v 2)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+3
+#+end_example
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (vector-set! v 1 4)
+  v
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+#(1 4 3)
+#+end_example
+
+Assume that we want to use our ~incr!~ macro to increase the value of
+one vector element.  As ~incr!~ expects a variable as its argument, we
+have make the locations associated to a vector accessible as if they
+were backed up by a variable.  Another feature of the (R6RS) macro
+system comes to our rescue:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (define-syntax v1
+    (identifier-syntax
+     [v1 (vector-ref v 1)]
+     [(set! v1 expr) (vector-set! v 1 expr)]))
+  (incr! v1)
+  v
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(5 #(1 5 3))
+#+end_example
+
+This macro isn't written with ~syntax-rules~ but uses
+~identifier-syntax~.  This is used to declare a keyword, ~v1~ in our
+case, that is transcribed differently, depending on whether it appears
+in the form ~v1~ or in the form ~(set! v1 expr)~ in the source code.
+
 * TODO Syntax objects
 
 ** TODO Identifiers
