@@ -132,7 +132,7 @@ implementations.  The R6RS language has some very high-quality
 implementations, including [[https://cisco.github.io/ChezScheme/][Chez Scheme]], [[https://www.gnu.org/software/guile/][GNU Guile]], [[https://scheme.fail/][Loko Scheme]], and [[https://racket-lang.org/][Racket]],
 so for any application area, there will be a suitable Scheme system.
 
-* TODO Some simple macros
+* Some simple macros
 
 Let us call a /combination/ an expression in Scheme of the form
 
@@ -452,6 +452,19 @@ When we run the following test, we see the given result printed.
 |6
 #+end_example
 
+We can demonstrate another facet of hygiene with this particular
+macro.  In the macro template, which is part of the macro's source,
+the identifier ~f~ is introduced and is bound by ~let~ appearing next
+to in the source.  In the particular use of the macro above, the
+pattern variable ~name~ represents another identifier name ~f~, namely
+the identifier with that name that appears in the macro use.  Although
+~f~ coming from the macro use is bound in the macro output within the
+scope of the binding of ~f~ coming from the macro text, it does not
+shadow the other ~f~ as this would be a violation of hygiene.
+Instead, the identifier ~f~ coming from the macro text is renamed by
+the Scheme macro expander, at least conceptually (as it isn't inserted
+as a free identifier, the precise name obviously doesn't matter).
+
 The ellipsis can also be used to turn our ~incr!~ macro into one that
 accepts more than one variable to increment:
 
@@ -531,7 +544,7 @@ Let us not forget to test the new version of the macro:
 (101 201)
 #+end_example
 
-** TODO Accessing vector locations through variables
+** Accessing vector locations through variables
 
 A /vector/ in Scheme is a collection of locations in the store that
 can be linearly addressed.  A new vector can be allocated with the
@@ -625,6 +638,16 @@ We can now use this macro as follows:
 #(2 6 3)
 #+end_example
 
+Note that the arguments ~vec-expr~ and ~idx-expr~ can stand for
+arbitrary expressions.  We evaluate these expressions once and store
+their values in the variables ~vec~ and ~idx~ (which will be suitably
+renamed by the macro expander so that they won't clash with user
+defined identifiers with the same name).  If we didn't do this but
+used ~vec-expr~ and ~idx-expr~ everywhere in place where ~vec~ and
+~idx~ appeared in the defined macro, the vector and the index
+expressions would be evaluated every time, the vector reference
+variable would be accessed.
+
 * TODO Syntax objects
 
 ** TODO Identifiers
@@ -681,4 +704,4 @@ as a successor to R6RS.  Time will tell whether the R7RS large
 language will be able to replace R6RS when it is finally done.  It is
 planned to include the R6RS macro facility in R7RS-large.
 
-#  LocalWords:  preprocessor
+#  LocalWords:  preprocessor expander
