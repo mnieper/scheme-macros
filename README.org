@@ -348,9 +348,7 @@ refers to the lexical binding it had at that place.  The other two
 occurrences of ~set!~ are copies from the macro input and thus refer
 to the lexical binding of ~set!~ as a let-bound variable.
 
-*** TODO Demonstrate macro that expands into itself.
-
-** TODO A tracing ~let~
+** A tracing ~let~
 
 Simple loops are often written using the named ~let~ form as in the following example:
 #+BEGIN_SRC scheme :results silent
@@ -650,7 +648,7 @@ used ~vec-expr~ and ~idx-expr~ everywhere in place where ~vec~ and
 expressions would be evaluated every time, the vector reference
 variable would be accessed.
 
-* TODO Syntax objects
+* Syntax objects
 
 The Scheme reports define hygiene and referential transparency for
 macros as follows:
@@ -672,7 +670,7 @@ to prove anything about these macros.  The purpose of this section is
 to disassemble everything and to explain what is going on under the
 hood.
 
-** TODO Identifiers
+** Identifiers
 
 The Lisp languages, and thus Scheme as well, are homoiconic
 programming languages, which means that if the program's internal
@@ -1003,11 +1001,80 @@ in the call to ~bound-identifier=?~.
 #t
 #+end_example
 
-** TODO Deconstructing syntax objects
-
-*** TODO Describe syntax objects.  Tell about wrapped and unwrapped ones.
-
 ** TODO Constructing syntax objects
+
+In the previous section we learned that Scheme code cannot be
+represented by a Scheme datum value (a Scheme value that has a written
+representation like a list, a number, or a symbol), at least not
+during the expansion process, as identifiers cannot be represented by
+symbols.
+
+The objects that do represent Scheme forms are called /syntax
+objects/.  The basic idea is that a syntax object is like a datum
+value but with identifiers instead of symbols.  So a list of
+identifiers or a vector of a number and an identifier, or a single
+string or identifier are all syntax objects.  Moreover, there can be a
+/wrap/ around a nonidentifier syntax object.
+
+Formally, syntax objects can inductively be defined as follows:
+
+- A nonpair, nonvector, or nonsymbol value is a syntax object.
+- A pair of syntax objects is a syntax object.
+- A vector of syntax objects is a syntax object.
+- An identifier is a syntax object.
+- A wrapped nonpair, nonvector, or nonsymbol value is a syntax object.
+- A wrapped pair or vector of syntax objects is a syntax object.
+
+To each syntax object corresponds a (datum) value by stripping all
+wraps and converting all identifiers to their symbolic names.  The
+Scheme procedure that does this conversion is ~syntax->datum~.  We
+have already seen it converting identifiers to symbols.  It is also
+used in effect by the ~quote~ special form: When Scheme evaluates an
+expression like ~(quote (1 2 foo))~, the (internal) procedure
+responsible for expanding or evaluating this expression will receive a
+syntax object whose underlying datum value is ~(1 2 foo)~ and will
+evaluate to this underlying value.
+
+We can construct the syntax object in the above example as a Scheme value:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (list 1 2 #'foo)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(1 2 #<syntax foo>)
+#+end_example
+
+It is a syntax object because it is a list of syntax objects (and
+Scheme lists are built from pairs and the empty list) and it has the
+expected corresponding (datum) value:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (syntax->datum (list 1 2 #'foo))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(1 2 foo)
+#+end_example
+
+In the previous section, we saw how to use ~syntax~ keyword
+(abbreviated by ~#'~) can be used to create identifiers.  In fact, the
+argument to the ~syntax~ keyword does not have to be symbol but can be
+any datum, so a ~syntax~ expression can be used to build more
+complicated syntax objects:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (syntax (1 2 foo))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+#<syntax (1 2 foo)>
+#+end_example
+
+** TODO Destructing syntax objects
 
 * TODO Syntax-case macros
 
@@ -1063,3 +1130,7 @@ language will be able to replace R6RS when it is finally done.  It is
 planned to include the R6RS macro facility in R7RS-large.
 
 #  LocalWords:  preprocessor expander homoiconic
+
+# Local Variables:
+# ispell-local-dictionary: "english"
+# End:
