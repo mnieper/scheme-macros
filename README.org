@@ -1001,7 +1001,7 @@ in the call to ~bound-identifier=?~.
 #t
 #+end_example
 
-** TODO Constructing syntax objects
+** Constructing syntax objects
 
 In the previous section we learned that Scheme code cannot be
 represented by a Scheme datum value (a Scheme value that has a written
@@ -1059,6 +1059,18 @@ expected corresponding (datum) value:
 (1 2 foo)
 #+end_example
 
+The predicate ~identifier?~ is a Scheme procedure that can be used to
+test whether a syntax object is an identifier or not:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (list (identifier? 1) (identifier? (list #'x)) (identifier? #'x))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(#f #f #t)
+#+end_example
+
 In the previous section, we saw how to use ~syntax~ keyword
 (abbreviated by ~#'~) can be used to create identifiers.  In fact, the
 argument to the ~syntax~ keyword does not have to be symbol but can be
@@ -1074,9 +1086,231 @@ complicated syntax objects:
 #<syntax (1 2 foo)>
 #+end_example
 
-** TODO Destructing syntax objects
+As the result shows, this is a wrapped syntax object, namely a wrapped
+list (of syntax objects).  The Scheme system uses the wrap to attach
+source location information to the syntax object (facilitating
+debugging), and the expander makes use of the fact that syntax objects
+can be opaque (wrapped) to provide optimal algorithmic complexity for
+the expansion process.
+
+Whether wrapped or not, we can apply ~syntax->datum~ on this syntax object:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (syntax->datum #'(1 2 foo))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(1 2 foo)
+#+end_example
+
+Here, we used again the abbreviation ~#'~ for ~syntax~.
+
+** Destructing syntax objects
+
+The syntax object returned by ~#'(1 2 foo)~ cannot be destructed using
+list procedures like ~car~ and ~cdr~ although it represents a list as
+it is wrapped.  Scheme offers a special form, ~syntax-case~ to
+destruct syntax objects.  A ~syntax-case~ form contains clauses, each
+consisting of a pattern of the form we already saw in connection with
+~syntax-rules~ and an expression.  An input syntax object is matched
+against the patterns in order and the expression corresponding to the
+first pattern that matches is evaluated:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (syntax-case #'(1 2 foo) ()
+    [(a b) 'case-1]
+    [(a b (c d)) 'case-2]
+    [(2 b c) 'case-3]
+    [(a b c d e ...) 'case-4]
+    [(a b c) 'case-5]
+    [x 'case-6])
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+case-5
+#+end_example
+
+(The empty list ~()~ appearing in the second argument of ~syntax-case~
+will be explained soon and plays the same role as the empty list we
+saw in our ~syntax-rules~ examples.)
+
+The pattern of the last clause would have also matched but the
+matching ends as soon as a matching clause (the fifth in this
+example) is found.  (The system will raise an exception if no match
+can be found.)
+
+Let us try to distinguish the syntax objects returned by ~#'(1 2 foo)~ and ~#'(1 2 bar)~.
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (syntax-case #'(1 2 foo) ()
+    [(a b bar) 'bar]
+    [(a b foo) 'foo])
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+bar
+#+end_example
+
+That we don't get the expected (or hoped for) result is because
+~syntax-case~ (as ~syntax-rules~) does treat every identifier
+appearing in a pattern as a pattern variable by default.  Thus, in the
+first pattern, ~bar~ is not matched against ~foo~ but ~bar~ is bound
+to ~foo~.  We can change this behavior by adding the identifiers that
+we want to match literally to the list that appeared as the empty list
+so far:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (syntax-case #'(1 2 foo) (bar foo)
+    [(a b bar) 'bar]
+    [(a b foo) 'foo])
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+foo
+#+end_example
+
+The equivalence predicate that ~syntax-case~ uses to compare an input
+identifier against a literal identifier is ~free-identifier=?~.  In
+the case of the example, both ~bar~ and ~foo~ are unbound and we
+recall that unbound identifiers are "~free-identifier=?~" if and only
+if they have the same symbolic name.  The next example demonstrates
+how the binding comes into play:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (let ([foo 1])
+    (define input
+      (let ([foo 2])
+        #'(1 2 foo)))
+    (syntax-case input (foo)
+      [(a b foo) 'match]
+      [(a b c) 'no-match]))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+no-match
+#+end_example
+
+We have now the tool to dispatch on the structure of a syntax object,
+but what we also need is a way to get hold of the individual
+components of a syntax object.  This is done with pattern variables
+(~a~, ~b~, and ~c~ in the example above).  We said above that a
+pattern variable is bound to the syntax object it is matched against.
+This scope of this binding is the expression following the pattern in
+the ~syntax-case~ clause.  Just a keywords are not ordinary variables,
+pattern variables are neither.  They may only be referenced inside the
+~syntax~ form as in the following example:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (syntax-case #'(1 x) ()
+    [(1 y) #'y])
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+#<syntax x>
+#+end_example
+
+Here, ~#'y~ does not resolve to the identifier ~y~ (because ~y~ is
+bound to a pattern variable) but to the syntax object to which ~y~ is
+bound, which is the value of ~#'(1 x)~.
+
+Mixing of pattern variables and non-pattern variable identifiers in
+the same ~syntax~ expression also works:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (syntax-case #'(1 x) ()
+    [(1 a) #'(b a)])
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(#<syntax b> #<syntax x>)
+#+end_example
+
+As one can see, the result is not a wrapped syntax object but a list
+of two syntax objects.  This is no coincidence.  When a pattern
+variable appears in a ~syntax~ template, all the substructure in which
+the pattern variable is replaced by what it was matched against, is
+unwrapped, so ordinary list and vector accessor procedures can be
+used.  The following is another example:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (syntax-case #'(1 2 3) ()
+    [(1 x ...) #'(a x ... b c)])
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(#<syntax a> #<syntax 2> #<syntax 3> . #<syntax (b c)>)
+#+end_example
+
+As can be seen, the pattern variable ~x~ is matched against the list
+of syntax objects consisting of ~2~ and ~3~.  Up to the part (and
+including it) where ~x~ is substituted, the syntax object is
+unwrapped.  The ellipsis in the ~syntax~ template works as the
+ellipsis in the ~syntax-rules~ templates (we will see below why this
+is no coincidence).
+
+In particular, we can use list procedures to reference
+individual elements or to calculate lengthes:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (define syntax-length
+    (lambda (stx)
+      (syntax-case stx ()
+        [(x ...)
+         (length #'(x ...))])))
+
+  (syntax-length #'(a b c d))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+4
+#+end_example
+
+We have already seen how literals in ~syntax-case~ can be used for
+literal matching of identifiers (using ~free-identifier=?~).
+Otherwise, ~syntax-case~ only matches per structure.  If we want to
+match structural element using special rules, /fenders/ can be used as
+in the following example:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (syntax-case #'(define 3 (+ 1 2)) ()
+    [(define id expr)
+     (identifier? #'id)
+     'ok]
+    [_ 'error])
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+error
+#+end_example
+
+The fender is the expression between the pattern and the final
+expression in the first clause of ~syntax-rules~.  If present, it is
+evaluated when the pattern matches.  If the evaluation yields ~#f~,
+this clause is skipped and matching is continued with the next clause.
+The scope of the pattern variables of a pattern includes a fender if
+present.
+
+The (sub)pattern ~_~ matches anything (like a pattern variable) but
+does not bind a pattern variable.
 
 * TODO Syntax-case macros
+
+We started this tutorial with writing macros and discussing a number
+of some example of such macros.  Somehow, we seemed to have deviated
+by talking about identifiers, syntax objects, and their construction
+and destruction.  In this section we will see how ~syntax-case~ and
+~syntax~ can be employed to write powerful macros.  In fact, they are
+the building blocks of macro transformers.
 
 ** TODO A fluid ~let~
 
