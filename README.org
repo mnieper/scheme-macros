@@ -1305,12 +1305,145 @@ does not bind a pattern variable.
 
 * TODO Syntax-case macros
 
+** Macro transformers
+
 We started this tutorial with writing macros and discussing a number
 of some example of such macros.  Somehow, we seemed to have deviated
 by talking about identifiers, syntax objects, and their construction
 and destruction.  In this section we will see how ~syntax-case~ and
 ~syntax~ can be employed to write powerful macros.  In fact, they are
 the building blocks of macro transformers.
+
+To make use of the forms ~syntax-case~ and ~syntax~, we have to
+understand what actually goes into a ~define-syntax~ definition.  The
+general form of a syntax definition is ~(define-syntax identifier
+transformer-expression)~ (the analogous holds for bindings in a
+~let-syntax~ expression).  When the Scheme expanders encounters a
+~define-syntax~ definition, it evaluates the ~transformer-expression~,
+which is an ordinary Scheme expression.  It's value must be a macro
+transformer, which is then bound to the keyword given by ~identifier~.
+
+Now, a macro transformer is just an ordinary Scheme procedure taking
+one argument, a syntax object, and returning one value, another syntax
+object.  The input syntax object represents the macro use form, the
+output syntax object represents the transcribed macro use.  Let us
+check this:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (let ([x 41])
+    (define-syntax always-42
+      (lambda (stx)
+        (syntax (+ 1 x))))
+
+    (+ always-42
+       (always-42 400)))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+84
+#+end_example
+
+Independently of how the macro is used --- that is, independently of
+what ~stx~ is ---, the macro transformer of this example always
+returns the expression ~(+ 1 x)~ (evaluating to ~42~).  Note that we
+could have equivalently written ~#'(+ 1 x)~ instead of ~syntax~.
+
+If we want to make the macro output dependent on the macro input, we
+have to employ ~syntax-case~ to destruct the input syntax object.  Let
+us first define a macro transformer that uses ~syntax-case~:
+
+#+BEGIN_SRC scheme :results silent
+  (define f
+    (lambda (stx)
+      (syntax-case stx ()
+        [(_ x ...)
+         (list #'quote (list (length #'(x ...)) #'(x ...)))])))
+#+END_SRC
+
+We can test this procedure as any other procedure:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (f #'(q a b c))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(#<syntax quote> (3 (#<syntax a> #<syntax b> #<syntax c>)))
+#+end_example
+
+The output is thus a syntax object of the form ~(quote (n x ...))~
+where the ~x~ denote the arguments following the head element of the
+syntax object argument to ~f~ and ~n~ is the number of these
+arguments.  The expression that yields the syntax object in the
+procedure ~f~ above is not very readable.  Because of that, Scheme
+also offer a ~quasisyntax~ form (abbreviated with ~#`~), which is to
+~syntax~ as ~quasiquote~ is to ~quote~:
+
+#+BEGIN_SRC scheme :results silent
+  (define f
+    (lambda (stx)
+      (syntax-case stx ()
+        [(_ x ...)
+         #`(quote (#,(length #'(x ...)) x ...))])))
+#+END_SRC
+
+Even more readable becomes the expression if pattern variables are
+used, which can not only be bound by ~syntax-case~ but also by
+~with-syntax~, which is for pattern variables what ~let~ is for
+ordinary variables:
+
+#+BEGIN_SRC scheme :results silent
+  (define f
+    (lambda (stx)
+      (syntax-case stx ()
+        [(_ x ...)
+         (with-syntax ([n (length #'(x ...))])
+           #'(quote (n x ...)))])))
+#+END_SRC
+
+In fact, ~with-syntax~ is not a primitive form but can be expressed in
+terms of ~syntax-case~:
+
+#+BEGIN_SRC scheme :eval no
+  (define-syntax with-syntax
+    (syntax-rules ()
+      [(with-syntax ([p e0] ...) e1 ... e2)
+       (syntax-case (list e0 ...) ()
+         [(p ...)
+          (let ()
+            e1 ... e2)])]))
+#+END_SRC
+
+In whatever way we write the procedure ~f~, we can then use it to
+define an actual macro:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax quote/length f)
+#+END_SRC
+
+Of course, instead of naming the macro transformer and just
+referencing to it in the right hand side of ~define-syntax~, we could
+have equally well written the transformer procedure expression inline.
+The advantage of the former is that the transformer procedure can then
+be easily tested using the usual tools, the advantage of the latter is
+that it is more compact[fn:8].
+
+Let's test our macro:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (quote/length a b c)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(3 a b c)
+#+end_example
+
+It should be noted that the calculation of the length, ~3~ in this
+case, happens at expand-time (so in the compiler if we use one).  In
+fact, a macro can be understood as a compiler for a sublanguage and
+that is be plugged into the Scheme system to extend the language.
 
 ** TODO A fluid ~let~
 
@@ -1333,6 +1466,10 @@ the building blocks of macro transformers.
 ** TODO Implementing a DSL
 
 * Footnotes
+
+[fn:8]When used in programs or libraries, there is one problem in the
+first approach because of so-called phasing issues.  We will come back
+to this.
 
 [fn:7]The term "history" of an identifier is not an established one
 but was invented for this presentation.
