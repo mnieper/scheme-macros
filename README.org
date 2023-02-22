@@ -1445,7 +1445,211 @@ case, happens at expand-time (so in the compiler if we use one).  In
 fact, a macro can be understood as a compiler for a sublanguage and
 that is be plugged into the Scheme system to extend the language.
 
-** TODO A fluid ~let~
+We now have amassed enough knowledge to give the definition of
+~syntax-rules~.  As the right hand side of ~define-syntax~ expects a
+procedure expression, a ~syntax-rules~ form must evaluate to a
+procedure.  And, in fact, ~syntax-rules~ can be defined as follows:
+
+#+BEGIN_SRC scheme :eval no
+  (define-syntax syntax-rules
+    (lambda (stx)
+      (syntax-case stx ()
+        [(_ (lit ...) [(k . p) t] ...)
+         (for-all identifier? #'(lit ... k ...))
+         #'(lambda (x)
+             (syntax-case x (lit ...)
+               [(_ . p) #'t] ...))])))
+#+END_SRC
+
+The ~syntax~ expression following the fender of the ~syntax-case~
+clause shows that a ~syntax-rules~ expression evaluates to a
+procedure.  There is another instance of ~syntax~ (~#'~) within the
+template of the outer ~syntax~ expression.  This is because procedure
+to which a ~syntax-rules~ expression evaluates outputs itself a syntax
+object.
+
+One more thing is remarkable:  Each ~syntax-rules~ pattern is of the
+form ~(k . p)~; more precisely, it can only match (syntax) pairs whose
+head element is an identifier, that is macro uses of exactly this
+form.  Notably, the pattern variable ~k~ isn't referenced in the
+output.  This is because a ~syntax-rules~ pattern ignores the pattern
+variable that corresponds to the keyword position.  In particular, the
+following two syntax definitions are equivalent:
+
+#+BEGIN_SRC scheme :eval no
+  (define-syntax incr!
+    (syntax-rules ()
+      [(incr! x) (set! x (+ x 1))]))
+#+END_SRC
+
+#+BEGIN_SRC scheme :eval no
+  (define-syntax incr!
+    (syntax-rules ()
+      [(_ x) (set! x (+ x 1))]))
+#+END_SRC
+
+This is in contrast to a ~syntax-case~ expression, which doesn't tread
+the keyword position in a special way.  This is the reason why we
+often use ~_~ at the keyword position in ~syntax-case~ expressions for
+macro transformers.
+
+It is a good time to finally give the definition of our initial
+~incr!~ macro in terms of ~syntax-case~:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax incr!
+    (lambda (stx)
+      (syntax-case stx ()
+        [(_ x)
+         (identifier? #'x)
+         #'(set! x (+ x 1))])))
+#+END_SRC
+
+It is instructive to go through the above definition of the
+~syntax-rules~ keyword and see how the earlier definition using
+~syntax-rules~ expands into the later definition using ~syntax-case~.
+The only line that is not present with the ~syntax-rules~ definition
+is the fender ~(identifier #'x)~, which has no equivalent for
+~syntax-rules~.  This fender ensures that a syntax error is reported
+early if the user tries to use this macro in a non-sensible form like
+in ~(incr! 2)~.
+
+** A fluid ~let~
+
+We should finally move past the ~incr!~ macro.  We already remarked
+that mutation (which ~incr!~ does) is frowned upon.  To be more
+precise, what makes problems is mutation with unlimited extent.
+Mutation with dynamic extent, on the other hand, can be used to
+implement dynamically scoped variables, which are also called fluids
+and do not have all the problems associated with unbound mutation.
+
+It is probably best to explain it with an example.  For this, we
+define a new binding-like construct, named ~fluid-let~[fn:9]:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax fluid-let
+    (lambda (stx)
+      (syntax-case stx ()
+        [(_ [(x e)] b1 ... b2)
+         (identifier? #'x)
+         #'(let ([y e])
+             (define swap!
+               (lambda ()
+                 (let ([t x])
+                   (set! x y)
+                   (set! y t))))
+             (dynamic-wind
+               swap!
+               (lambda ()
+                 b1 ... b2)
+               swap!))])))
+#+END_SRC
+
+Let us briefly check the output of the following expression:
+
+#+BEGIN_SRC scheme :results output :export both :wrap example
+  (let ([x 1])
+    (define show
+      (lambda ()
+        (display x)
+        (newline)))
+    (show)
+    (fluid-let ([x 2])
+      (show))
+    (show))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+#+end_example
+
+The ~dynamic-wind~ procedure takes three thunks (procedures that take
+no arguments) as arguments.  When ~dynamic-wind~ is called, it calls
+the three thunks in that order and finally returns the results of the
+call to the second, the middle, thunk.  The reason why we didn't write
+~(begin (swap!) ((lambda () b1 ... b2)) (swap!))~ is that
+~dynamic-wind~ arranges for calling the enter and exit thunk even in
+the presence of non-local control flow[fn:10].
+
+The variable ~y~ is used by the macro to store the old value of ~var~
+in it before the latter is mutated.  As ~y~ does not come from the
+macro input, it won't conflict with the definition of an identifier
+named ~y~ surrounding the use of ~fluid-let~.  Likewise, the temporary
+variable ~t~ won't conflict regardless of what variable the pattern
+variable ~x~ stands for.
+
+Our ~fluid-let~ can "bind" exactly one variable.  If we want to change
+more than value, say two, we have to rewrite our macro:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax fluid-let
+    (lambda (stx)
+      (syntax-case stx ()
+        [(_ [(x1 e1) (x2 e2)] b1 ... b2)
+         (for-all identifier? #'(x1 x2))
+         #'(let ([y1 e1] [y2 e2])
+             (define swap!
+               (lambda ()
+                 (let ([t x1])
+                   (set! x1 y1)
+                   (set! y1 t))
+                 (let ([t x2])
+                   (set! x2 y2)
+                   (set! y2 t))))
+             (dynamic-wind
+               swap!
+               (lambda ()
+                 b1 ... b2)
+               swap!))])))
+#+END_SRC
+
+#+BEGIN_SRC scheme :results output :export both :wrap example
+  (let ([a 1] [b 2])
+    (define show
+      (lambda ()
+        (display (list a b))
+        (newline)))
+    (show)
+    (fluid-let ([a 3] [b 4])
+      (show))
+    (show))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(1 2)
+(3 4)
+(1 2)
+#+end_example
+
+This is, of course, a non-solution because we still can't pass three
+variables and have also lost the ability of just passing one
+variable.  Possibly, the ellipsis can help as in the following
+attempt:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax fluid-let
+    (lambda (stx)
+      (syntax-case stx ()
+        [(_ [(x e) ...] b1 ... b2)
+         (for-all identifier? #'(x ...))
+         #'(let ([y e] ...)
+             (define swap!
+               (lambda ()
+                 (let ([t x])
+                   (set! x y)
+                   (set! y t))
+                ...))
+             (dynamic-wind
+               swap!
+               (lambda ()
+                 b1 ... b2)
+               swap!))])))
+#+END_SRC
+
+
+
+*** TODO Introduce ~generate-temporaries~.
 
 ** TODO Macro-generating macros
 
@@ -1466,6 +1670,14 @@ that is be plugged into the Scheme system to extend the language.
 ** TODO Implementing a DSL
 
 * Footnotes
+
+[fn:10]Remember that Scheme has first-class continuation.  But this is
+a topic for a different tutorial.
+
+[fn:9]In fact, the standard binding constructs in Scheme ~let~,
+~let*~, or ~letrec~ can also be defined as macro keywords in terms of
+the more primitive ~lambda~ using the macro facility described in this
+report.
 
 [fn:8]When used in programs or libraries, there is one problem in the
 first approach because of so-called phasing issues.  We will come back
