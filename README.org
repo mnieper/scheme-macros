@@ -1717,6 +1717,232 @@ With this tool at our disposal, we can finally write a version of
 
 ** TODO Macro-generating macros
 
+To have some use case at hand, let us assume that we deal with binary
+trees that carry a value at each (internal) node and at each leaf.  We
+can use the Scheme record facility to provide the necessary data
+types, implementing an abstract tree interface:
+
+#+BEGIN_SRC scheme :results silent
+  (define-record-type node (fields left value right))
+  (define-record-type leaf (fields value))
+#+END_SRC
+
+We can build a tree using the constructors defined by the above
+record-type definitions:
+
+#+BEGIN_SRC scheme :results silent
+  (define t
+    (make-node
+     (make-node (make-leaf 4) 2 (make-leaf 1))
+     8
+     (make-leaf -1)))
+#+END_SRC
+
+While creating a tree by hand in this way is doable, it is not very
+neat.  It would be nice if we could give the tree above in simple,
+parenthesized syntax as follows:
+#+BEGIN_SRC scheme :eval no
+  (((4)
+    2
+    (1))
+   8
+   (-1))
+#+END_SRC
+
+In other words, (internal) nodes are given by lists of three elements,
+and leafs by lists of one element.  To achieve this, one might want to
+write a procedure as the following one:
+
+#+BEGIN_SRC scheme :results silent
+  (define make-tree
+    (lambda (e)
+      (define n (length e))
+      (cond
+       [(= n 3)
+        (make-node (make-tree (car e))
+                   (cadr e)
+                   (make-tree (caddr e)))]
+       [(= n 1) (make-leaf (car e))]
+       [else
+        (assert #f)])))
+#+END_SRC
+
+We can then build our tree ~t~ as follows:
+
+#+BEGIN_SRC scheme :results silent
+  (define t
+    (make-tree
+     '(((4)
+        2
+        (1))
+       8
+       (-1))))
+#+END_SRC
+
+The ~quote~ (necessary so that Scheme does not try to evaluate our
+tree description as an expression) is not optimal, but we can write a
+macro that inserts the quote for us:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax tree
+    (syntax-rules ()
+      [(tree datum)
+       (make-tree 'datum)]))
+#+END_SRC
+
+With this macro, we can now build our tree with the following syntax:
+
+#+BEGIN_SRC scheme :results silent
+  (define t
+    (tree
+     (((4)
+        2
+        (1))
+       8
+       (-1))))
+#+END_SRC
+
+While this is optimal as far as the flexibility in syntax is
+concerned, the solution is inferior to our original approach of
+building the tree by calling the constructors ~make-node~ and
+~make-leaf~ by hand.  The point is that the procedure ~make-tree~,
+which is called in the output of the macro ~tree~, walks the tree
+expression at run time and so is not as efficient as the original
+approach.  What we want is that the tree expression is analyzed during
+compile time.  As macros are nothing but small compilers, it is no
+surprise that a macro will help.  All we have to do is to rewrite the
+~tree~ macro that it doesn't output a call to ~make-tree~ but that it
+directly outputs calls to ~make-node~ and ~make-leaf~:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax tree
+    (syntax-rules ()
+      [(tree (left value right))
+       (make-node (tree left) value (tree right))]
+      [(tree (value))
+       (make-leaf value)]))
+#+END_SRC
+
+The tree can be built as before:
+
+#+BEGIN_SRC scheme :results silent
+  (define t
+    (tree
+     (((4)
+        2
+        (1))
+       8
+       (-1))))
+#+END_SRC
+
+Now let us do something with the tree.  For example, we can ask for
+the sum of all values in the tree nodes, internal and leaf nodes:
+
+#+BEGIN_SRC scheme :results silent
+  (define tree-accumulate
+     (lambda (t)
+       (cond
+        [(node? t)
+         (+ (tree-accumulate (node-left t))
+            (node-value t)
+            (tree-accumulate (node-right t)))]
+        [(leaf? t)
+         (leaf-value t)]
+        [else (assert #f)])))
+#+END_SRC
+
+We can test the procedure with our example tree:
+
+#+BEGIN_SRC scheme :results value :export both :wrap example
+  (tree-accumulate t)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+14
+#+end_example
+
+We have used Scheme's general ~cond~ expression to dispatch on the two
+possible types of trees.  Compared to pattern matchers of other
+languages, this also does not deserve the attribute neat.  What we
+would like is to have a syntax so that we can write ~tree-accumulate~
+as follows:
+
+#+BEGIN_SRC scheme :eval no
+  (define tree-accumulate
+    (lambda (t)
+      (tree-case t
+       [(node left value right)
+        (+ (tree-accumulate left)
+           value
+           (tree-accumulate right))]
+       [(leaf value)
+        value])))
+#+END_SRC
+
+Obviously, this calls for another macro!
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax tree-case
+    (lambda (stx)
+      (define parse-clause
+        (lambda (cl)
+          (syntax-case cl (node leaf)
+            [[(node left value right) e1 ... e2]
+             #'[(node? tmp)
+                (let ([left (node-left tmp)]
+                      [value (node-value tmp)]
+                      [right (node-right tmp)])
+                  e1 ... e2)]]
+            [[(leaf value) e1 ... e2]
+             #'[(leaf? tmp)
+                (let ([value (leaf-value tmp)])
+                  e1 ... e2)]]
+            [_
+             (syntax-violation 'tree-case "invalid clause syntax" stx cl)])))
+      (syntax-case stx ()
+        [(_ tree-expr clause ...)
+         (with-syntax ([(clause ...)
+                        (map parse-clause #'(clause ...))])
+           #'(let ([tmp tree-expr])
+               (unless (tree? tmp)
+                 (assertion-violation 'tree-case "invalid tree argument" tmp))
+               (cond
+                clause ...
+                [else
+                 (assertion-violation 'tree-case "unhandled tree argument" tmp)])))]
+        [_
+         (syntax-violation 'tree-case "invalid syntax" stx)])))
+
+  (define tree?
+    (lambda (obj)
+      (or (node? obj)
+          (leaf? obj))))
+#+END_SRC
+
+*** TODO Explain some details, including ~syntax-violation~.
+
+With this macro, we can finally define and test our newly written ~tree-accumulate~:
+
+#+BEGIN_SRC scheme :results value :exports both :wrap example
+  (define tree-accumulate
+    (lambda (t)
+      (tree-case t
+       [(node left value right)
+        (+ (tree-accumulate left)
+           value
+           (tree-accumulate right))]
+       [(leaf value)
+        value])))
+
+  (tree-accumulate t)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+14
+#+end_example
+
 * TODO Breaking hygiene
 
 ** TODO A pitfall
@@ -1776,7 +2002,7 @@ as a successor to R6RS.  Time will tell whether the R7RS large
 language will be able to replace R6RS when it is finally done.  It is
 planned to include the R6RS macro facility in R7RS-large.
 
-#  LocalWords:  preprocessor expander homoiconic
+#  LocalWords:  preprocessor expander homoiconic matchers
 
 # Local Variables:
 # ispell-local-dictionary: "english"
