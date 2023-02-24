@@ -1920,9 +1920,140 @@ Obviously, this calls for another macro!
           (leaf? obj))))
 #+END_SRC
 
-*** TODO Explain some details, including ~syntax-violation~.
+In the above macro, we used the procedure ~syntax-violation~ defined
+by Scheme to report syntax errors when the macro is misused.  It is
+always a good idea to report syntax violations as early and as precise
+as possible.
 
-With this macro, we can finally define and test our newly written ~tree-accumulate~:
+The two identifiers, the Scheme reports speak of /auxiliary syntax/,
+~node~ and ~leaf~ are matched using ~free-identifier=?~.  Both of
+these identifiers are bound (they were bound by our record-type
+definitions of the ~node~ and the ~leaf~ type).  Thus, when the macro is used in the form
+#+BEGIN_SRC :scheme :eval no
+  (tree-case t
+   [(n l v r) ---]
+   ---)
+#+END_SRC
+the binding of the identifier ~n~ is compared to the binding of the
+identifier ~node~ (in the lexical context of the macro transformer).
+
+In general, it is a good idea to use bound identifiers as literals in
+~syntax-case~ (or ~syntax-rules~).  Even if the code surrounding a
+macro use of, say, ~tree-case~ binds ~node~ to something else, the
+library system of Scheme allows to import another identifier that is
+bound to the original binding of ~node~ so the ~tree-case~ macro can
+still be used with the other identifier in place.  This does not work
+when ~free-identifier=?~ compares unbound identifiers by name.
+
+With our ~tree-case~ macro, we can finally define and test our newly
+written ~tree-accumulate~:
+
+#+BEGIN_SRC scheme :results value :exports both :wrap example
+  (define tree-accumulate
+    (lambda (t)
+      (tree-case t
+       [(node left value right)
+        (+ (tree-accumulate left)
+           value
+           (tree-accumulate right))]
+       [(leaf value)
+        value])))
+
+  (tree-accumulate t)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+14
+#+end_example
+
+We have solved our binary-tree-use case but we can still do better.
+Assume that the problem we have to solve the next day does not involve
+binary trees but abstract syntax trees of a programming language, for
+which we have to write an interpreter or compiler.  Instead of
+(internal) nodes and leaves, we would have, say, expressions,
+statements, definitions, programs.  When walking an abstract syntax
+tree, one has to dispatch again on the possible types of an abstract
+syntax tree.  So, instead of ~tree-case~ we want ~ast-case~.  We could
+copy and suitably modify the ~tree-case~ macro but this would violate
+DRY.
+
+The answer is, instead, to write a macro, once and for all, that
+generates macros like ~tree-case~.  Here it is:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax define-destructor
+    (lambda (stx)
+      (syntax-case stx ()
+        [(_ name [keyword predicate-expr accessor-expr ...] ...)
+         (for-all identifier? #'(keyword ...))
+         (with-syntax
+             ([(pred-id ...)
+               (generate-temporaries #'(predicate-expr ...))]
+              [((acc-id ...) ...)
+               (map generate-temporaries #'((accessor-expr ...) ...))]
+              [((var ...) ...)
+               (map generate-temporaries #'((accessor-expr ...) ...))])
+           #'(begin
+               (define pred-id predicate-expr) ...
+               (define acc-id accessor-expr) ... ...
+               (define-syntax name
+                 (lambda (stx)
+                   (define parse-clause
+                     (lambda (cl)
+                       (syntax-case cl (keyword ...)
+                         [[(keyword var ...) e1 (... ...) e2]
+                          #'[(pred-id tmp)
+                             (let ([var (acc-id tmp)] ...)
+                               e1 (... ...) e2)]]
+                         ...
+                         [_
+                          (syntax-violation 'name "invalid clause syntax" stx cl)])))
+                   (syntax-case stx ()
+                     [(_ expr clause (... ...))
+                      (with-syntax ([(clause (... ...))
+                                     (map parse-clause #'(clause (... ...)))])
+                        #'(let ([tmp expr])
+                            (cond
+                             clause (... ...)
+                             [else
+                              (assertion-violation 'name "unhandled argument" tmp)])))]
+                     [_
+                      (syntax-violation 'name "invalid syntax" stx)])))))]
+        [_
+         (syntax-violation 'define-destructor "invalid syntax" stx)])))
+#+END_SRC
+
+A few explanations are in order.  First of all, we see nested ellipses
+in the code above.  Using ~syntax-case~ we can match a syntax object
+of the form ~((a b c) (1 2))~ against a pattern of the form ~((x ...)
+...)~.  The pattern variable ~x~ will then represent a list of two
+lists; the first list will contain the elements ~a~, ~b~, and ~c~, the
+second list will contain the elements ~1~ and ~2~.  In ~syntax~
+templates, the pattern variable can be used as long as least two
+ellipses follow.  For example, the template ~((x ...) ...)~ gives back
+~((a b c) (1 2))~, while ~(x ... ...)~ gives ~(a b c 1 2)~.
+
+We also have to explain the occurrences of ~(... ...)~.  In the
+definition of ~define-destructor~, the outer syntax form has to
+evaluate into a syntax object that contains ellipses, so we have to
+keep the outer syntax form from interpreting these ellipses that
+should be in the output syntax object, in other words, we have to
+escape them.  The Scheme way of doing this, is to write ~(... x)~.  If
+~syntax~ sees a sub-template like this one, it processes ~x~ and
+returns the result but gives the ellipsis in ~x~ the status of an
+ordinary identifier.
+
+Coming back to our tree example, the ~define-destructor~ syntax can be
+used as follows:
+
+#+BEGIN_SRC scheme :results silent
+  (define-destructor tree-case
+    [node node? node-left node-value node-right]
+    [leaf leaf? leaf-value])
+#+END_SRC
+
+Now we can redefine ~tree-accumulate~ and test it:
 
 #+BEGIN_SRC scheme :results value :exports both :wrap example
   (define tree-accumulate
