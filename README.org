@@ -1715,7 +1715,11 @@ With this tool at our disposal, we can finally write a version of
 (1 2)
 #+end_example
 
-** TODO Macro-generating macros
+** TODO Implementing a variant type in Scheme
+
+It is time to demonstrate more involved macros to highlight some
+features of the Scheme macro system and how it leads to extensibility
+of the language.
 
 To have some use case at hand, let us assume that we deal with binary
 trees that carry a value at each (internal) node and at each leaf.  We
@@ -2075,6 +2079,16 @@ Now we can redefine ~tree-accumulate~ and test it:
 #+end_example
 
 * TODO Breaking hygiene
+
+** TODO Define/who
+
+*** TODO Introduce with-implicit
+
+** TODO Define-constant
+
+*** TODO Explain identifier-syntax
+
+*** TODO Construct-name
 
 ** TODO A pitfall
 
