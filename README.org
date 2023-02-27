@@ -2293,9 +2293,96 @@ With it, we can rewrite our ~loop~ macro as follows:
                   (f)))))])))
 #+END_SRC
 
-** TODO Define/who
+** Definitions that make the bound name accessible
 
-*** TODO Introduce with-implicit
+For those who didn't like the ~loop~ example because it is mostly
+useful in imperative programming, we have provided another example,
+that we will describe in this subsection.
+
+User-friendly procedures check their arguments so that errors are
+reported early:
+
+#+BEGIN_SRC scheme :results silent
+  (define reverse-append
+    (lambda (head tail)
+      (unless (list? head)
+        (assertion-violation 'reverse-append "invalid list argument" head))
+      (let f ([head head] [tail tail])
+        (cond
+         [(null? head) tail]
+         [(pair? head)
+          (f (cdr head) (cons (car head) tail))]
+         [else
+          (assertion-violation 'reverse-append "concurrent modification detected")]))))
+#+END_SRC
+
+Just a brief test:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (reverse-append '(1 2 3) '(4 5 6))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(3 2 1 4 5 6)
+#+end_example
+
+The Scheme procedure that is used here to report an error is
+~assertion-violation~.  Its first formal argument is called ~who~ and
+(if not ~#f~) should be a string or symbol naming the procedure where
+the error occurs.
+
+One can make the point that the code above again violates some
+instance of the DRY principle because we had to type the name of the
+procedure, ~reverse-append~ in this case, three times.  The following,
+non-hygienic, macro, which can also be found in the source code of
+Chez Scheme and in one of Racket's libraries, helps:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax define/who
+    (lambda (x)
+      (define out
+        (lambda (k f e)
+          (with-syntax ([k k] [f f] [e e])
+            (with-implicit (k who)
+              #'(define f
+                  (let ((who 'f)) e))))))
+      (syntax-case x ()
+        [(k (f . u) e1 ... e2)
+         (identifier? #'f)
+         (out #'k #'f #'(lambda u e1 ... e2))]
+        [(k f e)
+         (identifier? #'f)
+         (out #'k #'f #'e)]
+        [_
+         (syntax-violation 'define/who "invalid syntax" x)])))
+#+END_SRC
+
+With ~define/who~ we can define a variable (or procedure) as with
+~define~.  Moreover, the identifier ~who~ (with a lexical and historic
+context as the keyword ~define/who~ in the macro use) is bound to the
+name of the variable (or procedure) being defined.
+
+With ~define/who~, the definition of ~reverse-append~ looks like:
+
+#+BEGIN_SRC scheme :results silent
+  (define/who reverse-append
+    (lambda (head tail)
+      (unless (list? head)
+        (assertion-violation 'who "invalid list argument" head))
+      (let f ([head head] [tail tail])
+        (cond
+         [(null? head) tail]
+         [(pair? head)
+          (f (cdr head) (cons (car head) tail))]
+         [else
+          (assertion-violation 'who "concurrent modification detected")]))))
+#+END_SRC
+
+We can compare ~who~ with the predefined identifier ~__func__~ that
+can be found in the C99 standard.  With Scheme and its macro system,
+however, this becomes a library feature and need not be a language
+feature.
 
 ** TODO Define-constant
 
