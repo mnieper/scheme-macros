@@ -2498,7 +2498,137 @@ Again, we have macro-defining macro.  Thanks to hygiene, the variable
 3.141592653589793
 #+end_example
 
-*** TODO Construct-name
+The number ~pi~ is just a single constant, so let us now turn to a use
+case where not only more than one constant but many constants are
+needed.  For concreteness, let us assume that want to develop a
+library handling ELF files.  We could start with defining all the
+magic constants:
+
+#+BEGIN_SRC scheme :eval no
+  (define-constant et-none #x00)
+  (define-constant et-rel  #x01)
+  (define-constant et-exec #x02)
+  ...
+  (define-constant pt-null #x00000000)
+  (define-constant pt-load #x00000001)
+  ...
+#+END_SRC
+
+This is not much different from what we would do in C.  However, it
+has the same problem.  It pollutes our top-level namespace.  In
+Scheme, this is mitigated a bit due to the library system (which
+allows one to confine these constants in a module); nevertheless a
+library that exports myriads of identifiers (and where the exact set
+of identifiers may depend on the version of the ELF format) is not a
+good idea.
+
+A way out is --- you will already have guessed it --- the Scheme macro
+system.  We will implement a macro ~define-constants~ that can be used
+as follows:
+
+#+BEGIN_SRC scheme :eval no
+  (define-constants elf-constant
+    (et-none #x00)
+    (et-rel  #x01)
+    ...)
+
+  (elf-constant et-none) ; => 0x01
+#+END_SRC
+
+Moreover, we want this definition to bind the identifier
+~elf-constants~ (note the "s") to a procedure returning an association
+list of the form
+
+#+BEGIN_SRC scheme :eval no
+  ((et-none . #x00)
+   (et-rel  . #x01)
+   ...)
+#+END_SRC
+
+For this, we first need a procedure that takes an identifier like
+~elf-constant~ and constructs a new identifier, ~elf-constants~ in
+this case, from it:
+
+#+BEGIN_SRC scheme :results silent
+  (define/who construct-name
+    (lambda (k . arg*)
+      (unless (identifier? k)
+        (assertion-violation who "invalid template identifier argument" k))
+      (datum->syntax
+       k
+       (string->symbol
+        (apply string-append
+               (map (lambda (x)
+                      (cond
+                       [(string? x)
+                        x]
+                       [(identifier? x)
+                        (symbol->string (syntax->datum x))]
+                       [else
+                        (assertion-violation who "invalid string or identifier argument" x)]))
+                    arg*))))))
+#+END_SRC
+
+This procedure takes a template identifier ~k~ and a sequence of
+strings and identifiers to forge and return an identifier with the
+same lexical and historic context as ~k~ and whose name is given by
+the concatenation of the sequence of strings and identifier (names).
+
+With it, we can define our ~define-constants~ easily:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax define-constants
+    (lambda (x)
+      (syntax-case x ()
+        [(_ t (n c) ...)
+         (and (identifier? #'t)
+              (for-all identifier? #'(n ...)))
+         (with-syntax ([ts (construct-name #'t #'t "s")]
+                       [(e ...) (generate-temporaries #'(c ...))])
+           #'(begin
+               (define e c)
+               ...
+               (define-syntax t
+                 (lambda (x)
+                   (syntax-case x ()
+                     [(_ y)
+                      (identifier? #'y)
+                      (cond
+                       [(assq (syntax->datum #'y) (list (cons 'n #'e) ...)) => cdr]
+                       [else
+                        (syntax-violation 't "unknown constant" x #'y)])]
+                     [_
+                      (syntax-violation 't "invalid syntax" x)])))
+               (define ts
+                 (lambda ()
+                   '([n . c] ...)))))])))
+#+END_SRC
+
+The macro is programmed so that the lookup of the constant happens at
+expand-time and not at run-time.  Let us test it:
+
+#+BEGIN_SRC scheme :results value :exports both :wrap example
+  (define-constants color
+    (salmon          #xFA8072)
+    (light-green     #x90EE90)
+    (cornflower-blue #x6495ED))
+
+  (colors)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+((salmon . 16416882) (light-green . 9498256) (cornflower-blue . 6591981))
+#+end_example
+
+#+BEGIN_SRC scheme :results value :exports both :wrap example
+  (color cornflower-blue)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+6591981
+#+end_example
 
 ** TODO A pitfall
 
