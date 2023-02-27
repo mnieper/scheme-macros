@@ -2384,9 +2384,119 @@ can be found in the C99 standard.  With Scheme and its macro system,
 however, this becomes a library feature and need not be a language
 feature.
 
-** TODO Define-constant
+** TODO Definitions of constants
 
-*** TODO Explain identifier-syntax
+In Scheme, we can use ~define~ to, well, define a variable.  This
+variable can be ~set!~ by other parts of the code, possibly
+accidentally.  So we may want to define a variable-like object that
+behaves more like a constant.  One option is to use the
+~identifier-syntax~ form, we already saw at the beginning of the
+tutorial:
+
+#+BEGIN_SRC scheme :results value :exports both :wrap example
+  (define-syntax pi (identifier-syntax 3.14159))
+  pi
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+3.14159
+#+end_example
+
+If we tried to mutate the "variable" ~pi~ now, the Scheme system would
+raise an exception.
+
+This is a good point to give the actual definition of
+~identifier-syntax~.  Like ~syntax-rules~, it can be defined by the
+more primitive forms ~syntax-case~ and ~syntax~:
+
+#+BEGIN_SRC scheme :eval no
+  (define-syntax identifier-syntax
+    (syntax-rules (set!)
+      [(_ e)
+       (lambda (x)
+         (syntax-case x ()
+           [id (identifier? #’id) #’e]
+           [(_ x (... ...)) #’(e x (... ...))]))]
+      [(_ (id exp1) ((set! var val) exp2))
+       (and (identifier? #’id) (identifier? #’var))
+       (make-variable-transformer
+        (lambda (x)
+          (syntax-case x (set!)
+            [(set! var val) #’exp2]
+            [(id x (... ...)) #’(exp1 x (... ...))]
+            [id (identifier? #’id) #’exp1])))]))
+#+END_SRC
+
+This definition can be found exactly in this form in the R6RS,
+describing the Scheme language and its standard libraries.  Again, we
+see the occurrence of the quoted ellipses ~(... ...)~, which is
+necessary because of the nesting of templates (remember that the right
+hand side of ~syntax-rules~ rules are ~syntax~ templates).
+
+We also note the two patterns within the first ~syntax-case~.  The
+first pattern is of the form ~id~ where ~id~ is an identifier, the
+second pattern is of the form ~(_ x ...)~ where ~x~ is an arbitrary
+form.  The first pattern will match if the identifier, ~pi~ in our
+example, is not used in head-position of a combination; the second
+pattern will match if ~pi~ is used in the form ~(pi x ...)~.  The
+latter does not make sense for ~pi~, but we see that
+~identifier-syntax~ allows us to define procedure-like identifiers
+that behave differently when the directly applied or when referenced.
+
+In the second part of the definition of ~identifier-syntax~, the
+procedure ~make-variable-transformer~ is used.  This turns a macro
+transformer given by a procedure (mapping syntax objects to syntax
+objects) into a /variable-transformer/.  A variable-transformer does
+the same mapping between syntax objects but will also be called by the
+expander when it processes an expression of the form ~(set! id form)~
+where ~id~ is the keyword bound to a variable-transformer.
+
+Now, 3.14159 is not the most precise value of ~pi~.  We get a value
+whose precision is adapted to the precision of Schemes inexact real
+numbers by using the formula ~(* 2 (atan 1 0))~.  This directly leads to the
+following attempt of redefining ~pi~:
+
+#+BEGIN_SRC scheme :results value :exports both :wrap example
+  (define-syntax pi (identifier-syntax (* 2 (atan 1 0))))
+  pi
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+3.141592653589793
+#+end_example
+
+This is not a good solution, though.  Every time, we reference ~pi~,
+Scheme replaces it by the expression ~(* 2 (atan 1 0))~, so unless we
+can rely on a sufficiently optimizing compiler, we will have ~pi~
+recalculated every time we use it.  A better approach is to calculate
+the value once, store this is a variable and expand into a reference
+to it:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax define-constant
+    (lambda (stx)
+      (syntax-case stx ()
+        [(_ id expr)
+         (identifier? #'id)
+         #'(begin
+             (define val expr)
+             (define-syntax id (identifier-syntax val)))])))
+#+END_SRC
+
+Again, we have macro-defining macro.  Thanks to hygiene, the variable
+~val~ cannot be accessed outside the macro.  Let's test our new macro:
+
+#+BEGIN_SRC scheme :results value :exports both :wrap example
+  (define-constant pi (* 2 (atan 1 0)))
+  pi
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+3.141592653589793
+#+end_example
 
 *** TODO Construct-name
 
