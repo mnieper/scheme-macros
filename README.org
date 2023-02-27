@@ -2080,6 +2080,219 @@ Now we can redefine ~tree-accumulate~ and test it:
 
 * TODO Breaking hygiene
 
+Scheme macros written with ~syntax-rules~ are hygienic.  This is also
+true by default for macros written with the more general
+~syntax-case~/~syntax~ combination.  Hygiene --- although it may take
+some time to understand --- is one of the selling points of Scheme
+macros and one (of many) reasons why Scheme macros are so more
+powerful than, say, macros in C or even in Common Lisp.
+
+Sometimes, however, we want to break hygiene explicitely.  We give a
+number of concrete examples:
+
+** A classical loop macro
+
+A classical example for this is a ~loop~ macro that provides a loop
+that evaluates the code enclosed in it repeatedly until a
+corresponding ~break~ command is evaluated.  A typical use looks like
+the following (again, not necessarily a good example for functional
+programming!):
+
+#+BEGIN_SRC scheme :eval no
+  (let ([i 0])
+    (loop
+      (when (= i 5)
+        (break))
+      (display i)
+      (newline)
+      (incr! i)))
+#+END_SRC
+
+Our first attempt to implement the ~loop~ construct with a macro is
+the following syntax definition:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax loop
+    (lambda (stx)
+      (syntax-case stx ()
+        [(_ e ...)
+         #'(call-with-current-continuation
+            (lambda (break)
+              (let f ()
+                e ...
+                (f))))])))
+#+END_SRC
+
+Here we make use of the fact that Scheme has first-class
+continuations.  The call to ~call-with-current-continuation~ captures
+the continuation of the named ~let~ expression.
+
+Nevertheless, our example code that is supposed to print the numbers
+zero to four won't work with this version of the ~loop~ keyword.  Our
+Scheme system will tell us that ~break~ is an undefined identifier (or
+refer to a predefined top-level identifier with this name).  Although,
+it won't say that, but hygiene is to be blamed for it.
+
+As the identifier ~break~ bound in the output of ~loop~ does not
+come from the input of the ~loop~ form, it has a different history
+than the identifier ~break~ appearing in the body of the loop form.
+Identifiers with different histories do not shadow each other, so the
+~break~ in the loop body cannot reference the binding of ~break~
+coming from the template in the ~loop~ macro.
+
+One way to solve it is to provide ~break~ as an explicit argument to
+the loop macro (we put a star to the name to mark the new syntax):
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax loop*
+    (lambda (stx)
+      (syntax-case stx ()
+        [(_ break e ...)
+         #'(call-with-current-continuation
+            (lambda (break)
+              (let f ()
+                e ...
+                (f))))])))
+#+END_SRC
+
+With this modification, everything works:
+
+#+BEGIN_SRC scheme :results output :export both :wrap example
+  (let ([i 0])
+    (loop* break
+      (when (= i 5)
+        (break))
+      (display i)
+      (newline)
+      (incr! i)))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+0
+1
+2
+3
+4
+#+end_example
+
+This solution has one more advantage besides that it actually works
+--- it allows us to specify the name we want to use for the expression
+breaking out of the loop.  For example, it allows us to easily nest two of
+the loops:
+
+#+BEGIN_SRC scheme :results output :export both :wrap example
+  (let ([i 0])
+    (loop* break-outer
+      (loop* break-inner
+        (when (= i 5)
+          (break-outer))
+        (when (= i 2)
+          (break-inner))
+        (display i)
+        (newline)
+        (incr! i))
+      (display "-\n")
+      (incr! i)))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+0
+1
+-
+3
+4
+#+end_example
+
+(Note how hygiene again helps to make this possible.  Both macro
+instances bind the identifier ~f~, but the occurrences of ~f~
+correspond to different histories so they don't shadow each other.)
+
+While the version with an explicit ~break~ argument to the ~loop*~
+macro has its advantages, sometimes we still may want the more terse
+syntax with an implicit ~break~ parameter.  To make our original
+version of ~loop~ work, we must not introduce a ~break~ identifier
+with a different history.  Instead, we must output ~break~ as if it
+appeared as an argument to the macro use.  In other words, we have to
+forge an identifier and ~datum->syntax~ was the tool to do this:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax loop
+    (lambda (stx)
+      (syntax-case stx ()
+        [(k e ...)
+         (with-syntax ([break (datum->syntax #'k 'break)])
+           #'(call-with-current-continuation
+              (lambda (break)
+                (let f ()
+                  e ...
+                  (f)))))])))
+#+END_SRC
+
+Here, for the first time, we make use of the keyword identifier of the
+macro use, which we bound to the pattern variable ~k~.  The call to
+~datum->syntax~ then returns an identifier named ~break~ as if it
+appears where the macro use keyword appears, that is with the same
+history and the same lexical context.
+
+Let us test our example with this new version!
+
+#+BEGIN_SRC scheme :results output :export both :wrap example
+  (let ([i 0])
+    (loop
+      (when (= i 5)
+        (break))
+      (display i)
+      (newline)
+      (incr! i)))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+0
+1
+2
+3
+4
+#+end_example
+
+** Convenience syntax to bind implicit identifiers
+
+Above, we used the ~datum->syntax~ procedure together with
+~with-syntax~ explicitly to inject an identifier as if it appeared at
+the macro use site into the template.  Chez Scheme provides a
+syntactic form ~with-implicit~ that abstracts from this low-level
+approach.  While the ~with-implicit~ form is non-standard, thanks to
+Scheme's macro system we can define it in any standard system:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax with-implicit
+    (lambda (x)
+      (syntax-case x ()
+        [(_ (k x ...) e1 ... e2)
+         (for-all identifier? #'(k x ...))
+         #'(with-syntax ([x (datum->syntax #'k 'x)] ...)
+             e1 ... e2)]
+        [_
+         (syntax-violation 'with-implicit "invalid syntax" x)])))
+#+END_SRC
+
+With it, we can rewrite our ~loop~ macro as follows:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax loop
+    (lambda (stx)
+      (syntax-case stx ()
+        [(k e ...)
+         (with-implicit (k break)
+           #'(call-with-current-continuation
+              (lambda (break)
+                (let f ()
+                  e ...
+                  (f)))))])))
+#+END_SRC
+
 ** TODO Define/who
 
 *** TODO Introduce with-implicit
@@ -2147,7 +2360,7 @@ as a successor to R6RS.  Time will tell whether the R7RS large
 language will be able to replace R6RS when it is finally done.  It is
 planned to include the R6RS macro facility in R7RS-large.
 
-#  LocalWords:  preprocessor expander homoiconic matchers
+#  LocalWords:  preprocessor expander homoiconic matchers Chez
 
 # Local Variables:
 # ispell-local-dictionary: "english"
