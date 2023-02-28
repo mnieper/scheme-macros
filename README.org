@@ -2734,7 +2734,104 @@ problem of nested macro invocations described above.
 
 * TODO Phasing
 
+Phasing is an issue that is not specific to the particular macro
+system of Scheme or hygienic macros but occurs with procedural macros
+when the system distinguishes between run-time and expand-time.  The
+latter distinction is important, for example, for the possibility of
+ahead-of-time compilation.  As Scheme allows to evaluate code at run
+time, which then has to be expanded first, run-time and expand-time
+can be interleaved.  The latter can also be due to the library system
+of Scheme; a library may need to be run first before another library
+can be expanded because the macro transformers may reference the code
+of the first library.
 
+** (Relative) phases
+
+When the expressions in a program or library are evaluated, the
+evaluation happens at a specific /relative phase/.  These relative
+phases are non-negative integers.  The top-level expressions are
+evaluated at relative phase 0.  The right-hand sides of top-level
+variable definitions are also evaluated at relative phase 0.  The
+right-hand sides of top-level syntax definitions are evaluated at
+relative phase 1 (which means: "earlier").  The right-hand side of a
+variable definition appearing within an expression evaluated at
+relative phase /n/ is also evaluated at relative phase /n/.  The
+right-hand side of a syntax definition appearing within an expression
+evaluated at relative phase /n/ is evaluated at relative /n/ + 1.
+
+In other words, /define-syntax/ shifts the phase by one for its
+right-hand side.
+
+The following code should make this clearer:
+
+#+BEGIN_SRC scheme :eval no
+  (begin
+    (define x 4)
+    (define-syntax foo
+      (lambda (stx)
+        (define-syntax bar
+          (lambda (stx)
+            #'3))
+        (+ 1 bar)))
+    (+ x foo))
+#+END_SRC
+
+Assume that this expression is evaluated at phase /n/ (0 if appearing
+at the program top-level).  The right-hand side of the definition of
+~x~, the reference to ~x~ and the use of the macro ~foo~ are evaluated
+at relative phase /n/.  The transformer expression of ~foo~ is
+evaluated at relative phases /n/ + 1, and the transformer expression
+of ~bar~ is evaluated at relative phase /n/ + 2.
+
+** Identifier references at different phases
+
+A variable (an identifier bound to a location holding a value) can be
+referenced by an expression if the expression is evaluated at the same
+relative phase as the initializing expression of the variable.  A
+keyword (an identifier bound to a macro transformer) can be referenced
+by an expression if the expression is evaluated at the same or higher
+relative phase than the phase of the transformer expression of the
+keyword minus one.
+
+The following code is erroneous, for example:
+
+#+BEGIN_SRC scheme :eval no
+  (let ([counter 0])
+    (define-syntax count!
+      (lambda (stx)
+        (syntax-case stx ()
+          [(_)
+           (begin
+             (set! counter (+ 1 counter))
+             #'(values))])))
+    (count!)
+    counter)
+#+END_SRC
+
+The variable ~counter~ can only be referenced at relative phase 0,
+thus not in the right-hand side of the syntax definition of ~count!~,
+which is evaluated at relative phase 1.  One can understand this
+restriction as follows: The variable ~counter~ only exists at
+run-time, not at compile-time of the program, but the transformer
+associated to ~count!~ us used at compile-time.
+
+On the other hand, the following example is correct code:
+
+#+BEGIN_SRC scheme :results value :export both :wrap example
+  (let-syntax ([foo (lambda (stx) #'1)])
+    (define-syntax bar
+      (lambda (stx)
+        (define-syntax quux
+          (lambda (stx)
+            foo))
+        quux))
+    bar)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+1
+#+end_example
 
 * TODO Extensions
 
