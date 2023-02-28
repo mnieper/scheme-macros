@@ -2630,11 +2630,115 @@ expand-time and not at run-time.  Let us test it:
 6591981
 #+end_example
 
-** TODO A pitfall
+** A pitfall
+
+Although the macros ~loop~ and ~define/who~ defined above are
+non-hygienic, they are only so in a controlled sense.  They behave as
+if the user has provided an explicit ~break~ or ~who~ identifier, so
+do not really differ from a hygienic macro, which makes reasoning
+about them still easy.
+
+Nevertheless, there is still a potential pitfall, we are going to
+explain now.  Consider the following definition of the macro
+~define-logging/who~:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax define-logging/who
+    (syntax-rules ()
+      [(define-logging/who (name . formals) body1 ... body2)
+       (define/who (name . formals)
+         (display "log: entering procedure ")
+         (display who)
+         (newline)
+         body1 ... body2)]))
+#+END_SRC
+
+The macro defines a "logging procedure", a procedure that prints a log
+message when it is called:
+
+#+BEGIN_SRC scheme :results output :exports both :wrap example
+  (define-logging/who (hello)
+    (display "Hello!\n"))
+  (hello)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+log: entering procedure hello
+Hello!
+#+end_example
+
+The ~define-logging/who~ macro's output is an instance of the
+~define/who~ macro from earlier.  The ~define-logging/who~ macro makes
+use of the implicitly defined ~who~ identifier.
+
+We named the macro ~define-logging/who~ with the suffix ~/who~ because
+the idea is that the user of the ~define-logging/who~ macro can also
+refer to the procedure's name through the implicitly bound identifier
+~who~.  This, however, is not the case as the following test shows:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (let ([who 'outer])
+    (define-logging/who (return-who)
+      who)
+    (return-who))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+outer
+#+end_example
+
+The reason is that historic context of the identifier ~who~ is the
+same as the historic context of the identifier ~define/who~ that
+occurs in the syntax template in the definition of
+~define-logging/who~.  The historic context of the identifier
+~define/who~, which does not come from the macro input in the use of
+~define-logging/who~, is therefore not the same as those of the
+identifiers ~who~ appearing in the source of our test.
+
+This problem cannot be easily mitigated bar explicitly define ~who~ a
+second time with the historic context of the final macro use.  One
+could think a possible solution would be the following rewrite:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax define-logging/who
+    (lambda (stx)
+      (syntax-case stx ()
+        [(k (name . formals) body1 ... body2)
+         (with-implicit (k define/who who)
+           #'(define/who (name . formals)
+               (display "log: entering procedure ")
+               (display who)
+               (newline)
+               body1 ... body2))])))
+#+END_SRC
+
+Here, the identifier ~define/who~ is put in the macro output of
+~define-logging/who~ with the same history as the keyword in the macro
+use of ~define-logging/who~.  This will create ~who~ with the historic
+context of the macro use of ~define-logging/who~ (and that's why we
+had to add ~who~ to the list of implicit identifiers as well), but it
+will only work if ~define/who~ is also bound (to the correct macro) at
+the use site of the macro ~define-logging/who~.  Such an assumption,
+however, should not be made.  (In the section after next we are going
+to finally give a solution that works, but it needs an extension which
+is not in R6RS.)
+
+Our other example for a macro with implicit (unhygienic) identifiers
+was ~define-constant~ where the plural form of the name of the defined
+macro was a forged identifier.  That identifier's history, however,
+was not derived from the macro keyword in the macro use but from the
+(singular) name of the defined macro.  This also helps mitigating the
+problem of nested macro invocations described above.
 
 * TODO Phasing
 
+
+
 * TODO Extensions
+
+** TODO Aliases
 
 ** TODO Syntax parameters
 
