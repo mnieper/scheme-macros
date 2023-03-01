@@ -2732,7 +2732,7 @@ was not derived from the macro keyword in the macro use but from the
 (singular) name of the defined macro.  This also helps mitigating the
 problem of nested macro invocations described above.
 
-* TODO Phasing
+* Phasing
 
 Phasing is an issue that is not specific to the particular macro
 system of Scheme or hygienic macros but occurs with procedural macros
@@ -2833,11 +2833,130 @@ On the other hand, the following example is correct code:
 1
 #+end_example
 
+If a procedure needs to be used in different phases, in Scheme the
+library system can be used.  If a library exports a variable (bound to
+the procedure) or any other identifier, the identifier can be imported
+at any relative phase.
+
 * TODO Extensions
 
-** TODO Aliases
+In this section, we will describe three extensions to Scheme macro's
+system that are not yet standardized in one the reports.  All three
+extensions are supported by Chez Scheme, so we can experiment with
+them.
+
+** Aliases
+
+Given an identifier ~x~, we may want to use it under a different name
+as well.  The first attempt of defining an alias for ~x~ may look
+like:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (let ([x 'old])
+    (define-syntax y
+      (identifier-syntax
+       [_ x]
+       [(set! _ e) (set! x e)]))
+    (set! y 'new)
+    x)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+new
+#+end_example
+
+This solution has no run-time overhead because ~y~ is a keyword and
+not a variable.  Whenever we access ~y~, Scheme's expander rewrites it
+into an access of ~x~.  In a lot of cases, this is all that we need.
+Still, ~y~ is not a true alias to ~x~.  This is demonstrated by the
+following test:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (let ([x 'old])
+    (define-syntax y
+      (identifier-syntax
+       [_ x]
+       [(set! _ e) (set! x e)]))
+    (free-identifier=? #'x #'y))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+#f
+#+end_example
+
+The reason that the result of the ~free-identifier=?~ test is ~#f~ is
+that ~x~ and ~y~ are bound differently.  The identifier ~x~ is bound
+to a location holding a value (~x~ is a variable); the identifier ~y~
+is bound to a macro transformer (~y~ is a keyword).
+
+The ~alias~ form described in [[https://srfi.schemers.org/srfi-212/srfi-212.html][SRFI 212]] allows to define true aliases.
+The syntax is ~(alias y x)~, which can be used wherever definitions
+are allowed.  It arranges that ~y~ has the same binding as ~x~:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (let ([x 'old])
+    (alias y x)
+    (set! y 'new)
+    (list (free-identifier=? #'x #'y) x))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(#t new)
+#+end_example
+
+(The reason why ~alias~ is not called ~define-alias~ is that it does
+not define a new binding; it just gives an existing binding (the one
+of ~x~) a new name (~y~).)
+
+With the ~alias~ form, there is also a general solution to the general
+problem of nested unhygienic macros that we exhibited with
+~define-logging/who~:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax define-logging/who
+    (lambda (stx)
+      (syntax-case stx ()
+        [(k (name . formals) body1 ... body2)
+         (with-syntax ([(tmp-id) (generate-temporaries #'(tmp))])
+           (with-syntax ([local-define/who
+                          (construct-name #'k #'tmp-id)])
+             (with-implicit (k who)
+               #'(begin
+                   (alias local-define/who define/who)
+                   (local-define/who (name . formals)
+                     (display "log: entering procedure ")
+                     (display who)
+                     (newline)
+                     body1 ... body2)))))])))
+#+END_SRC
+
+Here, we generate a fresh identifier and construct from its name an
+identifier with the context of the keyword of the use of
+~define-logging/who~.  This identifier is then aliased to ~define/who~
+but is used instead so that the transformer bound to ~define/who~ (and
+now also bound to ~define-logging/who~ forges the ~who~ identifier
+with the right context.
+
+Let us test our new version:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (let ([who 'outer])
+    (define-logging/who (return-who)
+      who)
+    (return-who))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+return-who
+#+end_example
 
 ** TODO Syntax parameters
+
+
 
 ** TODO Identifier properties
 
