@@ -4,6 +4,10 @@
 
 #+PROPERTY: header-args:scheme :session *session*
 
+The canonical HTML-formatted version of this document can be found at
+[[https://mnieper.github.io/scheme-macros/README.html]].  The interactive
+Org document is hosted at [[https://github.com/mnieper/scheme-macros]].
+
 * Preface
 
 This document is an introduction to writing powerful macros in Scheme.
