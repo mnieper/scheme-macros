@@ -1303,7 +1303,7 @@ present.
 The (sub)pattern ~_~ matches anything (like a pattern variable) but
 does not bind a pattern variable.
 
-* TODO Syntax-case macros
+* Syntax-case macros
 
 ** Macro transformers
 
@@ -1715,7 +1715,7 @@ With this tool at our disposal, we can finally write a version of
 (1 2)
 #+end_example
 
-** TODO Implementing a variant type in Scheme
+** Implementing a variant type in Scheme
 
 It is time to demonstrate more involved macros to highlight some
 features of the Scheme macro system and how it leads to extensibility
@@ -2078,7 +2078,7 @@ Now we can redefine ~tree-accumulate~ and test it:
 14
 #+end_example
 
-* TODO Breaking hygiene
+* Breaking hygiene
 
 Scheme macros written with ~syntax-rules~ are hygienic.  This is also
 true by default for macros written with the more general
@@ -2838,7 +2838,7 @@ library system can be used.  If a library exports a variable (bound to
 the procedure) or any other identifier, the identifier can be imported
 at any relative phase.
 
-* TODO Extensions
+* Extensions
 
 In this section, we will describe three extensions to Scheme macro's
 system that are not yet standardized in one the reports.  All three
@@ -3107,7 +3107,7 @@ implementation of ~define-integrable~ uses a syntax parameter to
 rebound ~count~ in the procedure body so that it is not further
 inlined.
 
-** TODO Identifier properties
+** Identifier properties
 
 It is often the case that two different macros have to communicate.
 In its simplest form we already saw it, namely in the case of macros
