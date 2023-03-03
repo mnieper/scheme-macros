@@ -3056,7 +3056,83 @@ hand side, syntax parameters have the same problem associated to
 variables with dynamic scope: Their change of the behavior of code is
 not lexically confined.
 
-** Identifier properties
+*** TODO Define integrable
+
+** TODO Identifier properties
+
+It is often the case that two different macros have to communicate.
+In its simplest form we already saw it, namely in the case of macros
+whose behavior depends on the presence of auxiliary syntax (another
+macro) in their inputs.  A typical example is Scheme's ~cond~ keyword
+(implementable as a macro in terms of ~if~) that uses the ~else~
+auxiliary syntax.
+
+Such an auxiliary keyword can function as a yes/no flag.  Sometimes,
+however, we may be interested in more than a boolean value.  This can
+be done with identifier properties, which are implemented in Chez
+Scheme and also described in [[https://srfi.schemers.org/srfi-213/srfi-213.html][SRFI 213]].
+
+An identifier property are superficially similar to symbol properties
+of Lisp, but there are important differences making them work with
+Scheme's macro system.  Identifier properties are associated with an
+existing binding of an identifier and thus automatically lexically
+scoped.  Each property is keyed by the binding of another identifier,
+so also property keys are lexically scoped.
+
+The ~define-property~ form, which can be used where ever a definition
+can be used, associates properties with identifiers:
+
+#+BEGIN_SRC scheme :results none
+  (define add1 (lambda (x) (+ 1 x)))
+  (define key)
+  (define-property add1 key #'"value")
+#+END_SRC
+
+If the ~define-property~ appears in a context evaluated at relative
+phase /n/, the very right-hand side of ~define-property~ is evaluated
+at relative phase /n/ + 1, much like the right-hand side of
+~define-syntax~.  This means that the property value, ~"(syntax "value")"~ in
+this example, is accessible at expand-time, but not a run-time.
+
+Regardless of the identifier property attached to ~add1~, the
+identifier is still a variable resolving to a procedure adding one to
+its argument:
+
+#+BEGIN_SRC scheme :results value :exports both :wrap example
+  (add1 2)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+3
+#+end_example
+
+Macro transformers can retrieve the values of identifier properties.
+If the need to do so, they have to return a procedure instead of a
+syntax object.  The returned procedure must accept one argument,
+~lookup~ and should return the syntax object which is the result of
+the transformation.  The ~lookup~ procedure takes two arguments ~id~
+and ~key~, which must be bound identifiers, and returns the value of
+the identifier property associated to ~id~ and keyed by ~key~, or ~#f~
+if there is none:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (let-syntax
+      ([x
+        (lambda (stx)
+          (lambda (lookup)
+            (syntax-case stx ()
+              [(_ key)
+               (or (lookup #'add1 #'key)
+                   #'"no-value")])))])
+    (define other-key)
+    (list (x key) (x other-key)))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+("value" "no-value")
+#+end_example
 
 
 
@@ -3114,3 +3190,4 @@ planned to include the R6RS macro facility in R7RS-large.
 # Local Variables:
 # ispell-local-dictionary: "english"
 # End:
+#  LocalWords:  boolean
