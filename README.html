@@ -1,0 +1,4355 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<!-- 2023-03-03 Fri 19:03 -->
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Extending a Language &#x2014; Writing Powerful Macros in Scheme</title>
+<meta name="author" content="Marc Nieper-Wißkirchen" />
+<meta name="generator" content="Org Mode" />
+<style>
+  #content { max-width: 60em; margin: auto; }
+  .title  { text-align: center;
+             margin-bottom: .2em; }
+  .subtitle { text-align: center;
+              font-size: medium;
+              font-weight: bold;
+              margin-top:0; }
+  .todo   { font-family: monospace; color: red; }
+  .done   { font-family: monospace; color: green; }
+  .priority { font-family: monospace; color: orange; }
+  .tag    { background-color: #eee; font-family: monospace;
+            padding: 2px; font-size: 80%; font-weight: normal; }
+  .timestamp { color: #bebebe; }
+  .timestamp-kwd { color: #5f9ea0; }
+  .org-right  { margin-left: auto; margin-right: 0px;  text-align: right; }
+  .org-left   { margin-left: 0px;  margin-right: auto; text-align: left; }
+  .org-center { margin-left: auto; margin-right: auto; text-align: center; }
+  .underline { text-decoration: underline; }
+  #postamble p, #preamble p { font-size: 90%; margin: .2em; }
+  p.verse { margin-left: 3%; }
+  pre {
+    border: 1px solid #e6e6e6;
+    border-radius: 3px;
+    background-color: #f2f2f2;
+    padding: 8pt;
+    font-family: monospace;
+    overflow: auto;
+    margin: 1.2em;
+  }
+  pre.src {
+    position: relative;
+    overflow: auto;
+  }
+  pre.src:before {
+    display: none;
+    position: absolute;
+    top: -8px;
+    right: 12px;
+    padding: 3px;
+    color: #555;
+    background-color: #f2f2f299;
+  }
+  pre.src:hover:before { display: inline; margin-top: 14px;}
+  /* Languages per Org manual */
+  pre.src-asymptote:before { content: 'Asymptote'; }
+  pre.src-awk:before { content: 'Awk'; }
+  pre.src-authinfo::before { content: 'Authinfo'; }
+  pre.src-C:before { content: 'C'; }
+  /* pre.src-C++ doesn't work in CSS */
+  pre.src-clojure:before { content: 'Clojure'; }
+  pre.src-css:before { content: 'CSS'; }
+  pre.src-D:before { content: 'D'; }
+  pre.src-ditaa:before { content: 'ditaa'; }
+  pre.src-dot:before { content: 'Graphviz'; }
+  pre.src-calc:before { content: 'Emacs Calc'; }
+  pre.src-emacs-lisp:before { content: 'Emacs Lisp'; }
+  pre.src-fortran:before { content: 'Fortran'; }
+  pre.src-gnuplot:before { content: 'gnuplot'; }
+  pre.src-haskell:before { content: 'Haskell'; }
+  pre.src-hledger:before { content: 'hledger'; }
+  pre.src-java:before { content: 'Java'; }
+  pre.src-js:before { content: 'Javascript'; }
+  pre.src-latex:before { content: 'LaTeX'; }
+  pre.src-ledger:before { content: 'Ledger'; }
+  pre.src-lisp:before { content: 'Lisp'; }
+  pre.src-lilypond:before { content: 'Lilypond'; }
+  pre.src-lua:before { content: 'Lua'; }
+  pre.src-matlab:before { content: 'MATLAB'; }
+  pre.src-mscgen:before { content: 'Mscgen'; }
+  pre.src-ocaml:before { content: 'Objective Caml'; }
+  pre.src-octave:before { content: 'Octave'; }
+  pre.src-org:before { content: 'Org mode'; }
+  pre.src-oz:before { content: 'OZ'; }
+  pre.src-plantuml:before { content: 'Plantuml'; }
+  pre.src-processing:before { content: 'Processing.js'; }
+  pre.src-python:before { content: 'Python'; }
+  pre.src-R:before { content: 'R'; }
+  pre.src-ruby:before { content: 'Ruby'; }
+  pre.src-sass:before { content: 'Sass'; }
+  pre.src-scheme:before { content: 'Scheme'; }
+  pre.src-screen:before { content: 'Gnu Screen'; }
+  pre.src-sed:before { content: 'Sed'; }
+  pre.src-sh:before { content: 'shell'; }
+  pre.src-sql:before { content: 'SQL'; }
+  pre.src-sqlite:before { content: 'SQLite'; }
+  /* additional languages in org.el's org-babel-load-languages alist */
+  pre.src-forth:before { content: 'Forth'; }
+  pre.src-io:before { content: 'IO'; }
+  pre.src-J:before { content: 'J'; }
+  pre.src-makefile:before { content: 'Makefile'; }
+  pre.src-maxima:before { content: 'Maxima'; }
+  pre.src-perl:before { content: 'Perl'; }
+  pre.src-picolisp:before { content: 'Pico Lisp'; }
+  pre.src-scala:before { content: 'Scala'; }
+  pre.src-shell:before { content: 'Shell Script'; }
+  pre.src-ebnf2ps:before { content: 'ebfn2ps'; }
+  /* additional language identifiers per "defun org-babel-execute"
+       in ob-*.el */
+  pre.src-cpp:before  { content: 'C++'; }
+  pre.src-abc:before  { content: 'ABC'; }
+  pre.src-coq:before  { content: 'Coq'; }
+  pre.src-groovy:before  { content: 'Groovy'; }
+  /* additional language identifiers from org-babel-shell-names in
+     ob-shell.el: ob-shell is the only babel language using a lambda to put
+     the execution function name together. */
+  pre.src-bash:before  { content: 'bash'; }
+  pre.src-csh:before  { content: 'csh'; }
+  pre.src-ash:before  { content: 'ash'; }
+  pre.src-dash:before  { content: 'dash'; }
+  pre.src-ksh:before  { content: 'ksh'; }
+  pre.src-mksh:before  { content: 'mksh'; }
+  pre.src-posh:before  { content: 'posh'; }
+  /* Additional Emacs modes also supported by the LaTeX listings package */
+  pre.src-ada:before { content: 'Ada'; }
+  pre.src-asm:before { content: 'Assembler'; }
+  pre.src-caml:before { content: 'Caml'; }
+  pre.src-delphi:before { content: 'Delphi'; }
+  pre.src-html:before { content: 'HTML'; }
+  pre.src-idl:before { content: 'IDL'; }
+  pre.src-mercury:before { content: 'Mercury'; }
+  pre.src-metapost:before { content: 'MetaPost'; }
+  pre.src-modula-2:before { content: 'Modula-2'; }
+  pre.src-pascal:before { content: 'Pascal'; }
+  pre.src-ps:before { content: 'PostScript'; }
+  pre.src-prolog:before { content: 'Prolog'; }
+  pre.src-simula:before { content: 'Simula'; }
+  pre.src-tcl:before { content: 'tcl'; }
+  pre.src-tex:before { content: 'TeX'; }
+  pre.src-plain-tex:before { content: 'Plain TeX'; }
+  pre.src-verilog:before { content: 'Verilog'; }
+  pre.src-vhdl:before { content: 'VHDL'; }
+  pre.src-xml:before { content: 'XML'; }
+  pre.src-nxml:before { content: 'XML'; }
+  /* add a generic configuration mode; LaTeX export needs an additional
+     (add-to-list 'org-latex-listings-langs '(conf " ")) in .emacs */
+  pre.src-conf:before { content: 'Configuration File'; }
+
+  table { border-collapse:collapse; }
+  caption.t-above { caption-side: top; }
+  caption.t-bottom { caption-side: bottom; }
+  td, th { vertical-align:top;  }
+  th.org-right  { text-align: center;  }
+  th.org-left   { text-align: center;   }
+  th.org-center { text-align: center; }
+  td.org-right  { text-align: right;  }
+  td.org-left   { text-align: left;   }
+  td.org-center { text-align: center; }
+  dt { font-weight: bold; }
+  .footpara { display: inline; }
+  .footdef  { margin-bottom: 1em; }
+  .figure { padding: 1em; }
+  .figure p { text-align: center; }
+  .equation-container {
+    display: table;
+    text-align: center;
+    width: 100%;
+  }
+  .equation {
+    vertical-align: middle;
+  }
+  .equation-label {
+    display: table-cell;
+    text-align: right;
+    vertical-align: middle;
+  }
+  .inlinetask {
+    padding: 10px;
+    border: 2px solid gray;
+    margin: 10px;
+    background: #ffffcc;
+  }
+  #org-div-home-and-up
+   { text-align: right; font-size: 70%; white-space: nowrap; }
+  textarea { overflow-x: auto; }
+  .linenr { font-size: smaller }
+  .code-highlighted { background-color: #ffff00; }
+  .org-info-js_info-navigation { border-style: none; }
+  #org-info-js_console-label
+    { font-size: 10px; font-weight: bold; white-space: nowrap; }
+  .org-info-js_search-highlight
+    { background-color: #ffff00; color: #000000; font-weight: bold; }
+  .org-svg { }
+</style>
+</head>
+<body>
+<div id="content" class="content">
+<h1 class="title">Extending a Language &#x2014; Writing Powerful Macros in Scheme</h1>
+<div id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#orgfc83d05">1. Preface</a></li>
+<li><a href="#org927878a">2. Prerequisites</a>
+<ul>
+<li><a href="#orge745090">2.1. Chez Scheme</a></li>
+<li><a href="#org8ec04ec">2.2. Emacs</a></li>
+<li><a href="#org803e11a">2.3. Org</a></li>
+<li><a href="#org24addcf">2.4. Geiser</a></li>
+<li><a href="#org36ac18b">2.5. Paredit</a></li>
+<li><a href="#orgde6dfc1">2.6. Initialization</a></li>
+</ul>
+</li>
+<li><a href="#orgb3bd8fb">3. The Scheme programming language</a></li>
+<li><a href="#org9471d03">4. Some simple macros</a>
+<ul>
+<li><a href="#orgf0a69a5">4.1. Incrementing a variable</a></li>
+<li><a href="#org50d0c04">4.2. A tracing <code>let</code></a></li>
+<li><a href="#org590e60d">4.3. Accessing vector locations through variables</a></li>
+</ul>
+</li>
+<li><a href="#orge4090ff">5. Syntax objects</a>
+<ul>
+<li><a href="#org49aee05">5.1. Identifiers</a></li>
+<li><a href="#org309a120">5.2. Constructing syntax objects</a></li>
+<li><a href="#org5561fb8">5.3. Destructing syntax objects</a></li>
+</ul>
+</li>
+<li><a href="#org1667c01">6. Syntax-case macros</a>
+<ul>
+<li><a href="#orgcd989aa">6.1. Macro transformers</a></li>
+<li><a href="#org1c32d41">6.2. A fluid <code>let</code></a></li>
+<li><a href="#org69aff37">6.3. Implementing a variant type in Scheme</a></li>
+</ul>
+</li>
+<li><a href="#org1956bb1">7. Breaking hygiene</a>
+<ul>
+<li><a href="#org5b97738">7.1. A classical loop macro</a></li>
+<li><a href="#orgb8878a8">7.2. Convenience syntax to bind implicit identifiers</a></li>
+<li><a href="#org99195e7">7.3. Definitions that make the bound name accessible</a></li>
+<li><a href="#orgab1a16c">7.4. Definitions of constants</a></li>
+<li><a href="#orgc1614b1">7.5. A pitfall</a></li>
+</ul>
+</li>
+<li><a href="#orgc9fe97b">8. Phasing</a>
+<ul>
+<li><a href="#orgc6cee21">8.1. (Relative) phases</a></li>
+<li><a href="#orge16ff1a">8.2. Identifier references at different phases</a></li>
+</ul>
+</li>
+<li><a href="#org0f73892">9. Extensions</a>
+<ul>
+<li><a href="#orga26005f">9.1. Aliases</a></li>
+<li><a href="#orga30b8c8">9.2. Syntax parameters</a></li>
+<li><a href="#orgb768b1e">9.3. Identifier properties</a></li>
+</ul>
+</li>
+<li><a href="#org114e579">10. Complex examples</a>
+<ul>
+<li><a href="#orge49e13f">10.1. <span class="todo TODO">TODO</span> An LR(1) parser generator implemented as a Scheme macro</a></li>
+</ul>
+</li>
+<li><a href="#orged7e42e">11. Exercises</a></li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-orgfc83d05" class="outline-2">
+<h2 id="orgfc83d05"><span class="section-number-2">1.</span> Preface</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+This document is an introduction to writing powerful macros in Scheme.
+It was initially written on the occasion of a tutorial I give at the
+<a href="https://bobkonf.de/2023/en/">BOB2023 Konferenz</a> in Berlin on 17 March 2023.
+</p>
+
+<p>
+The macro facility, especially its built-in <i>hygiene</i>, is one of the
+fundamental pillars of the Scheme programming language.  While more
+complicated than the simple token-replacing macros of other languages
+like C, Scheme macros can be written in a way that make them robust
+and so that the abstractions they offer seamless blend into the
+language and cannot be distinguished from syntactic forms built into
+the language.  It is often felt that this expressiveness makes writing
+Scheme macros more complicated (even something of a black art) than
+writing C or Common Lisp macros, for example.  One goal of this
+tutorial is to convince the audience otherwise.
+</p>
+
+<p>
+While the Scheme macro facility has always been avant-garde (and this
+is one of the reasons why Scheme was chosen as the implementation
+language for this tutorial), a lot of what is said here also applies
+to languages that provide corresponding features.  It is also a appeal
+to language designers that languages should include a macro facility
+as Scheme does, as this allows for small language cores and enables
+the user to provide their own syntactic abstractions.
+</p>
+
+<p>
+Another reason why the Scheme language is used in this tutorial is
+that it has an exceptionally clear semantics, is a compact language,
+and is easy to learn.
+</p>
+
+<p>
+The document can both be read as is or used interactively in an Emacs
+session.  In the following section, a possible setup is described.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org927878a" class="outline-2">
+<h2 id="org927878a"><span class="section-number-2">2.</span> Prerequisites</h2>
+<div class="outline-text-2" id="text-2">
+</div>
+<div id="outline-container-orge745090" class="outline-3">
+<h3 id="orge745090"><span class="section-number-3">2.1.</span> Chez Scheme</h3>
+<div class="outline-text-3" id="text-2-1">
+<p>
+We need a Scheme implementation.  This tutorial assumes <a href="https://cisco.github.io/ChezScheme/">Chez Scheme</a>,
+which is one of the most mature, standard-compliant Scheme
+implementations.  You can get Chez Scheme from its homepage.  On
+Debian-based GNU/Linux system like Ubuntu, it is prepackaged.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org8ec04ec" class="outline-3">
+<h3 id="org8ec04ec"><span class="section-number-3">2.2.</span> Emacs</h3>
+<div class="outline-text-3" id="text-2-2">
+<p>
+We will use <a href="https://www.gnu.org/software/emacs/">GNU Emacs</a> as our development environment, which has great
+tooling for Scheme.  The typical GNU/Linux system ships with it.
+</p>
+
+<p>
+For GNU Emacs &lt; 28, enable the <a href="https://elpa.nongnu.org/">NonGNU Emacs Lisp Package Archive</a> in
+your <a href="https://www.gnu.org/software/emacs/manual/html_node/emacs/Init-File.html">init file</a> or <a href="https://www.gnu.org/software/emacs/manual/html_node/emacs/Easy-Customization.html">customize</a> the variable <code>package-archives</code>.
+Likewise, enable the <a href="https://elpa.nongnu.org/nongnu-devel/">NonGNU-devel ELPA Packages</a>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org803e11a" class="outline-3">
+<h3 id="org803e11a"><span class="section-number-3">2.3.</span> Org</h3>
+<div class="outline-text-3" id="text-2-3">
+<p>
+<a href="https://orgmode.org/">Org Mode</a> is a GNU Emacs major mode that allows to document, edit and
+execute source code.
+</p>
+
+<p>
+The current versions of Org packaged with Emacs hide Scheme evaluation
+errors.  This is fixed in the version in Org's git repository, for
+which Org <a href="https://orgmode.org/org.html#Installation">provides installation instructions</a>.
+</p>
+
+<p>
+Familiarize yourself with how one works with <a href="https://orgmode.org/org.html#Working-with-Source-Code">source code in an Org
+document</a>, especially how to <a href="https://orgmode.org/org.html#Editing-Source-Code">edit</a> and <a href="https://orgmode.org/org.html#Evaluating-Code-Blocks">execute code</a>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org24addcf" class="outline-3">
+<h3 id="org24addcf"><span class="section-number-3">2.4.</span> Geiser</h3>
+<div class="outline-text-3" id="text-2-4">
+<p>
+<a href="https://www.nongnu.org/geiser/">Geiser</a> is a GNU Emacs package that allows to runs Scheme processes in
+GNU Emacs, and which is used by Org's Babel.  To install it, it is
+enough to install the package <a href="https://gitlab.com/emacs-geiser/chez/-/blob/master/geiser-chez.el">geiser-chez</a> using GNU Emacs' <a href="https://www.gnu.org/software/emacs/manual/html_node/emacs/Package-Menu.html">package
+menu</a>.  We need the most recent development version.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org36ac18b" class="outline-3">
+<h3 id="org36ac18b"><span class="section-number-3">2.5.</span> Paredit</h3>
+<div class="outline-text-3" id="text-2-5">
+<p>
+<a href="https://paredit.org/">Paredit</a>, a tool for parenthetical editing in Emacs makes working with
+Scheme code a lot more pleasant.  Like Geiser, it can be installed
+through GNU Emacs' package manager.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgde6dfc1" class="outline-3">
+<h3 id="orgde6dfc1"><span class="section-number-3">2.6.</span> Initialization</h3>
+<div class="outline-text-3" id="text-2-6">
+<p>
+After the GNU Emacs packages have been installed, we want to customize
+them for our needs.  The following should go into your init file
+unless you want to execute the following code every time you start GNU
+Emacs.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="color: #a020f0;">require</span> '<span style="color: #008b8b;">compile</span>)
+(autoload 'enable-paredit-mode <span style="color: #8b2252;">"paredit"</span> <span style="color: #8b2252;">"Turn on pseudo-structural editing of Lisp code"</span> t)
+(add-hook 'scheme-mode-hook #'enable-paredit-mode)
+(show-paren-mode t)
+(<span style="color: #a020f0;">setq</span> auto-mode-alist (cons '(<span style="color: #8b2252;">"\\.ss"</span> . scheme-mode) auto-mode-alist))
+(<span style="color: #a020f0;">setq</span> auto-mode-alist (cons '(<span style="color: #8b2252;">"\\.sls"</span> . scheme-mode) auto-mode-alist))
+(<span style="color: #a020f0;">setq</span> auto-mode-alist (cons '(<span style="color: #8b2252;">"\\.sps"</span> . scheme-mode) auto-mode-alist))
+(add-to-list 'compilation-error-regexp-alist
+             '(<span style="color: #8b2252;">"^</span><span style="color: #8b2252; font-weight: bold;">\\</span><span style="color: #8b2252; font-weight: bold;">(</span><span style="color: #8b2252;">Exception</span><span style="color: #8b2252; font-weight: bold;">\\</span><span style="color: #8b2252; font-weight: bold;">|</span><span style="color: #8b2252;">Warning</span><span style="color: #8b2252; font-weight: bold;">\\</span><span style="color: #8b2252; font-weight: bold;">)</span><span style="color: #8b2252;">.*: .* </span><span style="color: #8b2252; font-weight: bold;">\\</span><span style="color: #8b2252; font-weight: bold;">(</span><span style="color: #8b2252;">line </span><span style="color: #8b2252; font-weight: bold;">\\</span><span style="color: #8b2252; font-weight: bold;">(</span><span style="color: #8b2252;">[0-9]+</span><span style="color: #8b2252; font-weight: bold;">\\</span><span style="color: #8b2252; font-weight: bold;">)</span><span style="color: #8b2252;">, char </span><span style="color: #8b2252; font-weight: bold;">\\</span><span style="color: #8b2252; font-weight: bold;">(</span><span style="color: #8b2252;">[0-9]+</span><span style="color: #8b2252; font-weight: bold;">\\</span><span style="color: #8b2252; font-weight: bold;">)</span><span style="color: #8b2252;"> of </span><span style="color: #8b2252; font-weight: bold;">\\</span><span style="color: #8b2252; font-weight: bold;">(</span><span style="color: #8b2252;">.*</span><span style="color: #8b2252; font-weight: bold;">\\</span><span style="color: #8b2252; font-weight: bold;">)</span><span style="color: #8b2252; font-weight: bold;">\\</span><span style="color: #8b2252; font-weight: bold;">)</span><span style="color: #8b2252;">"</span> 5 3 4 nil 2))
+(<span style="color: #a020f0;">setq</span> geiser-default-implementation 'chez)
+(org-babel-do-load-languages
+ 'org-babel-load-languages
+ '((scheme . t)))
+(<span style="color: #a020f0;">setq</span> org-confirm-babel-evaluate nil)
+</pre>
+</div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgb3bd8fb" class="outline-2">
+<h2 id="orgb3bd8fb"><span class="section-number-2">3.</span> The Scheme programming language</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+Scheme is programming language of the Lisp family.  Its defining
+properties are its uniform parenthesized syntax (inherited from Lisp),
+first-class procedures and continuations, lexical scoping, dynamic
+typing, proper tail calls and hygienic macros.  It is primarly a
+functional programming language but allows many other programming
+paradigms.
+</p>
+
+<p>
+The Scheme programming language was developed in the 1970s by Guy
+L. Steele and Gerald Jay Sussman.  Since then it has been refined and
+further developed through a series of de facto standards called the
+Revised<sup><i>n</i></sup> Report(s) on the Algorithmic Language Scheme (R/n/RS).
+The two current standards are R6RS (2007) and R7RS-small (2013).
+Despite the versioning and the timeline, R6RS is the more detailed,
+more advanced and more modern standard<sup><a id="fnr.1" class="footref" href="#fn.1" role="doc-backlink">1</a></sup>.
+</p>
+
+<p>
+In this tutorial, we work with the macro facility of R6RS, which is
+far more powerful than the one of R7RS-small, and also discuss some
+proposed or implemented extensions.  Such extensions to the Scheme
+programming language are often proposed, discussed and implemented
+using the <a href="https://srfi.schemers.org/">Scheme Requests for Implementation</a> process, where everyone
+can submit a <i>SRFI</i> extending the Scheme programming language.
+Whenever we speak of the <i>Scheme</i> language in this text, we default to
+the R6RS dialect.
+</p>
+
+<p>
+For practical programming, one needs, of course, an implementation.
+Scheme is possibly the programming language with the highest number of
+implementations.  The R6RS language has some very high-quality
+implementations, including <a href="https://cisco.github.io/ChezScheme/">Chez Scheme</a>, <a href="https://www.gnu.org/software/guile/">GNU Guile</a>, <a href="https://scheme.fail/">Loko Scheme</a>, and <a href="https://racket-lang.org/">Racket</a>,
+so for any application area, there will be a suitable Scheme system.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org9471d03" class="outline-2">
+<h2 id="org9471d03"><span class="section-number-2">4.</span> Some simple macros</h2>
+<div class="outline-text-2" id="text-4">
+<p>
+Let us call a <i>combination</i> an expression in Scheme of the form
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(operator operand ...)
+</pre>
+</div>
+
+<p>
+An example is given by the following expression evaluating to the answer of life:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(* 21 2)
+</pre>
+</div>
+
+<pre class="example" id="org9130c7e">
+42
+</pre>
+
+<p>
+Such a combination is usually evaluated by evaluating the operator and
+the operands in some unspecific order and by then calling the
+procedure resulting from the operator evaluation with arguments
+resulting from the operand evaluations.
+</p>
+
+<p>
+Scheme, however, also possesses special forms, which do not follow
+this evaluation strategy.  An example is given by the conditional <code>if</code>.
+</p>
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">if</span> (number? 2)
+    'ok
+    (/ 1 0))
+</pre>
+</div>
+
+<pre class="example" id="orgc713305">
+ok
+</pre>
+
+<p>
+If the conditional were a normal combination, the operands, and <code>(/ 1
+0)</code> in particular, would have been evaluated first (and
+unconditionally).  Scheme recognizes special forms through the
+operator in first position, namely if it is a keyword (a special type
+of identifier).  The Scheme macro facility allows the programmer to
+define their own keywords.
+</p>
+</div>
+
+<div id="outline-container-orgf0a69a5" class="outline-3">
+<h3 id="orgf0a69a5"><span class="section-number-3">4.1.</span> Incrementing a variable</h3>
+<div class="outline-text-3" id="text-4-1">
+<p>
+Let us ignore for a moment that mutation is frowned upon in functional
+programming and let us assume that we have to frequently increase the
+value of variables in our program.  Given a variable <code>x</code>, this is done
+in Scheme through the following expression:
+</p>
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">set!</span> x (+ x 1))
+</pre>
+</div>
+<p>
+That the variable <code>x</code> is repeated in this expression is unpleasant
+(and may be considered a violation of the DRY principle), so we want
+an operator akin to C's pre/post-increment operator.  Unfortunately,
+Scheme does not provide such an operator, but, fortunately, it doesn't
+have to because we can build one ourself.
+</p>
+
+<p>
+Our first attempt could be to write a procedure (the primary means of
+abstraction in functional programming languages)<sup><a id="fnr.2" class="footref" href="#fn.2" role="doc-backlink">2</a></sup>:
+</p>
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">incr!</span>
+  (<span style="color: #a020f0;">lambda</span> (x)
+    (<span style="color: #a020f0;">set!</span> x (+ x 1))))
+</pre>
+</div>
+
+<p>
+This attempt, however, is failed:
+</p>
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">x</span> 1)
+(incr! x)
+x
+</pre>
+</div>
+
+<pre class="example" id="orgd9eb211">
+1
+</pre>
+
+<p>
+The reason that it doesn't work &#x2014; the variable's value is still 1
+and not 2 &#x2014; is that <code>(incr! x)</code> is a normal combination as
+introduced earlier.  As the arguments are evaluated first and the
+procedure is called with their values, in this example, <code>incr!</code> is
+called with the argument <code>1</code>.  This is then bound to a new variable
+<code>x</code> locally to <code>incr!</code>.  It is this variable, which is increased by 1
+and not the top-level variable.
+</p>
+
+<p>
+The solution is, of course, to define <code>incr!</code> not as a procedure<sup><a id="fnr.3" class="footref" href="#fn.3" role="doc-backlink">3</a></sup>
+but as a keyword.  In the Scheme programming language, the
+<code>define-syntax</code> keyword can be used for it:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">incr!</span>
+  (<span style="color: #a020f0;">syntax-rules</span> ()
+    ((incr! x)
+     (<span style="color: #a020f0;">set!</span> x (+ x 1)))))
+</pre>
+</div>
+
+<p>
+This definition says that <code>incr!</code> is defined to be a new keyword,
+implemented as a macro.  The <code>syntax-rules</code> line shall be viewed as
+boilerplate for the moment (and we will come back to it later).
+Important are the next two lines.  The form <code>(incr! x)</code> is a pattern
+saying that the macro matches against a use of the form <code>(keyword
+form)</code> (where <code>keyword</code> is necessarily <code>incr!</code>).  When the macro is
+used, the pattern variable <code>x</code> is bound to the <code>form</code>.  The form
+<code>(set! x (+ x 1))</code> is a template.  When the macro is used, the pattern
+variables in the template are replaced with the forms they are bound
+to and the substituted template is then used in place of the macro.
+</p>
+
+<p>
+In the following example, <code>(incr! y)</code> is effectively substituted by
+<code>(set! y (+ y 1))</code>, so we have achieved what we wanted<sup><a id="fnr.4" class="footref" href="#fn.4" role="doc-backlink">4</a></sup>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">y</span> 10)
+(incr! y)
+y
+</pre>
+</div>
+
+<pre class="example" id="org2091423">
+11
+</pre>
+
+<p>
+As a side note, we see from the discussion that <code>set!</code> is another
+keyword (like <code>if</code>, it cannot be a procedure for the same reasons why
+our attempt to write <code>incr!</code> as a procedure doesn't work).
+</p>
+
+<p>
+As any other identifier in Scheme, the identifier <code>set!</code> can also be
+rebound as in the following example:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">let</span> ([<span style="color: #a020f0;">set!</span> (<span style="color: #a020f0;">lambda</span> (x y) (+ x y))])
+  (<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">x</span> 1)
+  (<span style="color: #a020f0;">set!</span> x 2))
+</pre>
+</div>
+
+<pre class="example" id="org2290acc">
+3
+</pre>
+
+<p>
+In the body of the <code>let</code> form, <code>set!</code> has lost its usual meaning and
+is bound to a procedure adding its two arguments.  It is most
+interesting to see what happens when we use our <code>incr!</code> macro, which
+refers to <code>set!</code>, in the body of the <code>let</code> form:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">let</span> ([<span style="color: #a020f0;">set!</span> (<span style="color: #a020f0;">lambda</span> (x y) (/ 1 0))])
+  (<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">x</span> 1)
+  (incr! x)
+  x)
+</pre>
+</div>
+
+<pre class="example" id="orgf2bbbad">
+2
+</pre>
+
+<p>
+This example yields the correct result <code>2</code>, although calling <code>set!</code>
+within the <code>let</code> body would raise an exception.  The reason for this
+is the already mentioned hygiene of Scheme macros.  The identifier
+<code>set!</code> in the output of the <code>incr!</code> macro didn't occur in its input
+but came from the macro definition.  Scheme macro hygiene now ensures
+that it still refers to the lexical binding it had where it occured in
+the program source.  Note that the C preprocessor &#x2014; as an example
+for a very simple, if not primitive macro facility &#x2014; wouldn't have
+ensured it.  Whether a C macro works correctly or not often depends on
+the lexical environment of the macro use site.
+</p>
+
+<p>
+We say that hygienic Scheme macros are referentially transparent.
+This is already known from procedures in functional programming
+languages and lexical scoping:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">f</span>
+  (<span style="color: #a020f0;">let</span> ([x 1])
+    (<span style="color: #a020f0;">lambda</span> () x)))
+
+(list (f)
+      (<span style="color: #a020f0;">let</span> ([x 2])
+        (f)))
+</pre>
+</div>
+
+<pre class="example" id="org6c5cc49">
+(1 1)
+</pre>
+
+<p>
+Wherever the procedure <code>f</code> is called, it always evaluates to <code>1</code>.
+</p>
+
+<p>
+We finish this subsection with another example of hygiene:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">let</span> ([<span style="color: #a020f0;">set!</span> 2])
+  (incr! set!)
+  set!)
+</pre>
+</div>
+
+<pre class="example" id="org3876ec2">
+3
+</pre>
+
+<p>
+The result, which is the increment of the original value of the
+variable <code>set!</code> by one, can again be explained by hygiene and by
+distinguishing the identifier <code>set!</code> that appears in the macro use and
+the same-named identifier <code>set!</code> appearing in the macro source.
+Without distinguishing both, the macro use <code>(incr! set!)</code> is
+transcribed to <code>(set! set! (+ set! 1))</code>.  In this transcription, the
+first <code>set!</code> originates from the macro transformer and thus still
+refers to the lexical binding it had at that place.  The other two
+occurrences of <code>set!</code> are copies from the macro input and thus refer
+to the lexical binding of <code>set!</code> as a let-bound variable.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org50d0c04" class="outline-3">
+<h3 id="org50d0c04"><span class="section-number-3">4.2.</span> A tracing <code>let</code></h3>
+<div class="outline-text-3" id="text-4-2">
+<p>
+Simple loops are often written using the named <code>let</code> form as in the following example:
+</p>
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">fact</span>
+  (<span style="color: #a020f0;">lambda</span> (n)
+    (<span style="color: #a020f0;">let</span> <span style="color: #0000ff;">f</span> ([n n] [a 1])
+      (<span style="color: #a020f0;">if</span> (zero? n)
+          a
+          (f (- n 1) (* a n))))))
+</pre>
+</div>
+
+<p>
+In order to facilitate debugging, let us define a version of the named
+<code>let</code> form that prints the arguments with which the loop recursion is
+entered and with which it is exited<sup><a id="fnr.5" class="footref" href="#fn.5" role="doc-backlink">5</a></sup>.  As <code>let</code> is a special
+form, this has to be a special form as well, so let us write our second macro:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme"><span style="color: #b22222;">;; </span><span style="color: #b22222;">A form of a named let that prints information about each recursive</span>
+<span style="color: #b22222;">;; </span><span style="color: #b22222;">call.</span>
+(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">trace-let</span>
+  (<span style="color: #a020f0;">syntax-rules</span> ()
+    [(<span style="color: #a020f0;">trace-let</span> name ([var expr] ...) body1 ... body2)
+     (<span style="color: #a020f0;">let</span> <span style="color: #0000ff;">f</span> ([depth 0] [var expr] ...)
+       (<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">name</span>
+         (<span style="color: #a020f0;">lambda</span> (var ...)
+           (f (+ depth 1) var ...)))
+       (indent depth)
+       (display <span style="color: #8b2252;">"("</span>)
+       (display 'name)
+       (<span style="color: #a020f0;">begin</span>
+         (display <span style="color: #8b2252;">" "</span>)
+         (display var))
+       ...
+       (display <span style="color: #8b2252;">")"</span>)
+       (newline)
+       (call-with-values
+           (<span style="color: #a020f0;">lambda</span> ()
+             body1 ... body2)
+         (<span style="color: #a020f0;">lambda</span> val*
+           (indent depth)
+           (fold-left
+            (<span style="color: #a020f0;">lambda</span> (sep val)
+              (display sep)
+              (display val)
+              <span style="color: #8b2252;">" "</span>)
+            <span style="color: #8b2252;">""</span> val*)
+           (newline)
+           (apply values val*))))]))
+
+<span style="color: #b22222;">;; </span><span style="color: #b22222;">Helper procedure referenced by the macro output of the macro above.</span>
+(<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">indent</span>
+  (<span style="color: #a020f0;">let</span> ([pattern <span style="color: #8b2252;">"| "</span>])
+    (<span style="color: #a020f0;">lambda</span> (depth)
+      (<span style="color: #a020f0;">do</span> ([i 0 (+ i 1)])
+          ((&gt; i depth))
+        (display (string-ref pattern (mod i 2)))))))
+</pre>
+</div>
+
+<p>
+In this macro, the pattern is given by <code>(trace-let name ([var expr]
+...) body1 ... body2)</code>, while the template makes up the bulk of the
+macro.  Already in the pattern, we see a new syntax, the ellipsis
+<code>...</code>.  It means that the subpattern preceding it may appear repeated
+zero or more times in the input.  When such a subpattern is matched,
+the contained pattern variables represent lists of forms.
+</p>
+
+<p>
+In the template, the ellipsis means to repeat the preceding
+subtemplate as many times as the pattern variables contained in it
+represent forms.  For this to work, every such subtemplate has to
+contain at least one pattern variable, obviously, and all pattern
+variables contained in it have to represent lists of forms of the same
+length.
+</p>
+
+<p>
+Note the occurrence of <code>begin</code> in the macro.  Normally, in a procedure
+body, <code>(begin expression ...)</code> is equivalent to the list of
+<code>expressions</code>, here, however, we have to use it.  The reason is that
+following ellipsis refers the immediately preceding subtemplate, so it
+is crucial that the two display commands (which we both want to
+repeated once per variable) appear in a single form.
+</p>
+
+<p>
+When we run the following test, we see the given result printed.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">fact</span>
+  (<span style="color: #a020f0;">lambda</span> (n)
+    (<span style="color: #a020f0;">trace-let</span> f ([n n])
+      (<span style="color: #a020f0;">if</span> (zero? n)
+          1
+          (* (f (- n 1)) n)))))
+(fact 3)
+</pre>
+</div>
+
+<pre class="example" id="org1c31ddf">
+|(f 3)
+| (f 2)
+| |(f 1)
+| | (f 0)
+| | 1
+| |1
+| 2
+|6
+</pre>
+
+<p>
+We can demonstrate another facet of hygiene with this particular
+macro.  In the macro template, which is part of the macro's source,
+the identifier <code>f</code> is introduced and is bound by <code>let</code> appearing next
+to in the source.  In the particular use of the macro above, the
+pattern variable <code>name</code> represents another identifier name <code>f</code>, namely
+the identifier with that name that appears in the macro use.  Although
+<code>f</code> coming from the macro use is bound in the macro output within the
+scope of the binding of <code>f</code> coming from the macro text, it does not
+shadow the other <code>f</code> as this would be a violation of hygiene.
+Instead, the identifier <code>f</code> coming from the macro text is renamed by
+the Scheme macro expander, at least conceptually (as it isn't inserted
+as a free identifier, the precise name obviously doesn't matter).
+</p>
+
+<p>
+The ellipsis can also be used to turn our <code>incr!</code> macro into one that
+accepts more than one variable to increment:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">incr!</span>
+  (<span style="color: #a020f0;">syntax-rules</span> ()
+    ((incr! x ...)
+     (<span style="color: #a020f0;">begin</span>
+       (<span style="color: #a020f0;">set!</span> x (+ x 1))
+       ...))))
+</pre>
+</div>
+
+<p>
+Let us briefly test our new extended macro:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">x</span> 10)
+(<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">y</span> 20)
+(incr! x y)
+(list x y)
+</pre>
+</div>
+
+<pre class="example" id="org898bd92">
+(11 21)
+</pre>
+
+<p>
+The role of <code>begin</code> in the macro definition of the extended <code>incr!</code>
+differs from the role in our previous use of <code>begin</code>.  Here it is used
+to solve the problem that the template that prescribes the macro
+output has to be a single form.
+</p>
+
+<p>
+One can also write the multi-variable <code>incr!</code> macro without the
+ellipsis by letting the macro expand into itself.  This is not
+necessarily how one would do it, but here it serves as a demonstration
+for further macro techniques:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">incr!</span>
+  (<span style="color: #a020f0;">syntax-rules</span> ()
+    ((incr!)
+     (values))
+    ((incr! x . x*)
+     (<span style="color: #a020f0;">begin</span>
+       (<span style="color: #a020f0;">set!</span> x (+ x 1))
+       (incr! . x*)))))
+</pre>
+</div>
+
+<p>
+First of all, this is our first macro with two transcription <i>rules</i>,
+where each rule consists of a pattern and of a template.  The pattern
+of the first rule is <code>(incr!)</code>, the pattern of the second rule is
+<code>(incr! x . x*)</code>.  Scheme's macro expander tries to match the macro
+input against the patterns in the order in which the patterns appear
+in the <code>syntax-rules</code> form.
+</p>
+
+<p>
+The second new thing is a a pattern of the form <code>(incr! x . x*)</code>,
+which matches an (improper) list of at least two elements, the first
+being the macro keyword and the second one being bound to the pattern
+variable <code>x</code>.  The rest arguments are bound as an (improper) list to
+the pattern variable <code>x*</code>.
+</p>
+
+<p>
+Finally, this example demonstrates a recursive macro, that is a macro
+that transforms the input into an instance of itself.  As long as the
+output of a macro use involves a new macro use (possibly with the same
+keyword), the Scheme expander continues with transcribing the macro.
+</p>
+
+<p>
+Let us not forget to test the new version of the macro:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">x</span> 100)
+(<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">y</span> 200)
+(incr! x y)
+(list x y)
+</pre>
+</div>
+
+<pre class="example" id="org87fc0da">
+(101 201)
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org590e60d" class="outline-3">
+<h3 id="org590e60d"><span class="section-number-3">4.3.</span> Accessing vector locations through variables</h3>
+<div class="outline-text-3" id="text-4-3">
+<p>
+A <i>vector</i> in Scheme is a collection of locations in the store that
+can be linearly addressed.  A new vector can be allocated with the
+<code>vector</code> procedure:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">v</span> (vector 1 2 3))
+v
+</pre>
+</div>
+
+<pre class="example" id="orgaa8e3e3">
+#(1 2 3)
+</pre>
+
+<p>
+Vector elements can be retrieved using <code>vector-ref</code> and mutated using <code>vector-set!</code>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(vector-ref v 2)
+</pre>
+</div>
+
+<pre class="example" id="orgacdf93d">
+3
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(vector-set! v 1 4)
+v
+</pre>
+</div>
+
+<pre class="example" id="orgd865db3">
+#(1 4 3)
+</pre>
+
+<p>
+Assume that we want to use our <code>incr!</code> macro to increase the value of
+one vector element.  As <code>incr!</code> expects a variable as its argument, we
+have make the locations associated to a vector accessible as if they
+were backed up by a variable.  Another feature of the (R6RS) macro
+system comes to our rescue:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">v1</span>
+  (identifier-syntax
+   [v1 (vector-ref v 1)]
+   [(<span style="color: #a020f0;">set!</span> v1 expr) (vector-set! v 1 expr)]))
+(incr! v1)
+v
+</pre>
+</div>
+
+<pre class="example" id="org4d636b4">
+#(1 5 3)
+</pre>
+
+<p>
+This macro isn't written with <code>syntax-rules</code> but uses
+<code>identifier-syntax</code>.  This is used to declare a keyword, <code>v1</code> in our
+case, that is transcribed differently, depending on whether it appears
+in the form <code>v1</code> or in the form <code>(set! v1 expr)</code> in the source code.
+</p>
+
+<p>
+To access the zeroth or the second element of the vector <code>v</code>, we could
+define identifier macros <code>v0</code> and <code>v2</code> similar to <code>v1</code> but this would
+mean mostly duplicating code and violating the DRY principle.  A
+better approach is to use the Scheme macro system once more.  We
+define a macro that, when used, defines a customized macro<sup><a id="fnr.6" class="footref" href="#fn.6" role="doc-backlink">6</a></sup>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">define-vector-reference</span>
+  (<span style="color: #a020f0;">syntax-rules</span> ()
+    [(define-vector-reference var vec-expr idx-expr)
+     (<span style="color: #a020f0;">begin</span>
+       (<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">vec</span> vec-expr)
+       (<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">idx</span> idx-expr)
+       (<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">var</span>
+         (identifier-syntax
+          [var (vector-ref vec idx)]
+          [(<span style="color: #a020f0;">set!</span> var expr) (vector-set! vec idx expr)])))]))
+</pre>
+</div>
+
+<p>
+We can now use this macro as follows:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(define-vector-reference initial-element v 0)
+(incr! initial-element)
+v
+</pre>
+</div>
+
+<pre class="example" id="org63d3a43">
+#(2 5 3)
+</pre>
+
+<p>
+Note that the arguments <code>vec-expr</code> and <code>idx-expr</code> can stand for
+arbitrary expressions.  We evaluate these expressions once and store
+their values in the variables <code>vec</code> and <code>idx</code> (which will be suitably
+renamed by the macro expander so that they won't clash with user
+defined identifiers with the same name).  If we didn't do this but
+used <code>vec-expr</code> and <code>idx-expr</code> everywhere in place where <code>vec</code> and
+<code>idx</code> appeared in the defined macro, the vector and the index
+expressions would be evaluated every time, the vector reference
+variable would be accessed.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orge4090ff" class="outline-2">
+<h2 id="orge4090ff"><span class="section-number-2">5.</span> Syntax objects</h2>
+<div class="outline-text-2" id="text-5">
+<p>
+The Scheme reports define hygiene and referential transparency for
+macros as follows:
+</p>
+
+<ul class="org-ul">
+<li>If a macro transformer inserts a binding for an identifier (variable
+or keyword) not appearing in the macro use, the identifier is in
+effect rename throughout its scope to avoid conflicts with other
+identifiers.</li>
+
+<li>If a macro transformer inserts a free reference to an identifier,
+the reference refers to the binding that was visible where the
+transformer was specified, regardless of any local bindings that may
+surround the use of the macro.</li>
+</ul>
+
+<p>
+The examples of the previous section make it hopefully a bit clear
+what is meant by these two points.  Nevertheless, one may think that
+there still must be some magic at work and that it will be impossible
+to prove anything about these macros.  The purpose of this section is
+to disassemble everything and to explain what is going on under the
+hood.
+</p>
+</div>
+
+<div id="outline-container-org49aee05" class="outline-3">
+<h3 id="org49aee05"><span class="section-number-3">5.1.</span> Identifiers</h3>
+<div class="outline-text-3" id="text-5-1">
+<p>
+The Lisp languages, and thus Scheme as well, are homoiconic
+programming languages, which means that if the program's internal
+representation is a datum of the language.  In first approximation,
+the internal representation of a Scheme expression (as of a Scheme
+program) is a Scheme datum value.  For example, the program
+(expression)
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">let</span> ([x 1])
+  (+ x 2))
+</pre>
+</div>
+
+<p>
+is represented by a list whose first element is the symbol <code>let</code>,
+whose second element is a list of a list with two elements and whose
+third element is a list of the three data <code>+</code>, <code>x</code>, and <code>2</code>.
+</p>
+
+<p>
+Due to existence of hygienic macros we have to amend this traditional
+picture.  Consider the following example.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">let</span> ([<span style="color: #a020f0;">set!</span> 10])
+  (incr! set!)
+  set!)
+</pre>
+</div>
+
+<p>
+To evaluate the <code>let</code> expression, the macro use of <code>incr!</code> has to be
+expanded first.  After the expansion, the expression would look like
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">let</span> ([<span style="color: #a020f0;">set!</span> 10])
+  (<span style="color: #a020f0;">set!</span> set! (+ set! 1))
+  set!)
+</pre>
+</div>
+
+<p>
+if Scheme expressions were represented by Scheme datum values and
+within, identifiers were represented by symbols.  It is obvious that
+this cannot be how the Scheme expander works because there would be no
+way to tell which copy of the symbol <code>set!</code> refers to which binding.
+The point is that identifiers cannot be represented by symbols, which
+only have a symbolic name.  Instead, to an <i>identifier</i> both a
+symbolic name and a lexical context are associated.  When the binding
+of an identifier is looked up, it is looked up in the lexical context
+associated with it.
+</p>
+
+<p>
+In Scheme, symbols are first-class values.  The can be created using
+the syntax <code>(quote name)</code>, which can be abbreviated to <code>'name</code>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">'red
+</pre>
+</div>
+
+<pre class="example" id="org5c41b68">
+red
+</pre>
+
+<p>
+The same is true for identifiers.  They are created just like symbols
+but use the syntax <code>(syntax identifier)</code>, which can be abbreviated to
+<code>#'identifier</code>, instead:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">#'x
+</pre>
+</div>
+
+<pre class="example" id="org1a36d1a">
+#&lt;syntax x&gt;
+</pre>
+
+<p>
+(The format of the output, <code>#&lt;syntax x&gt;</code>, is implementation-specific,
+because identifiers are not Scheme datum values and thus have no
+standardized or faithful written representation.)
+</p>
+
+<p>
+Evaluating of the form <code>(syntax x)</code> (or <code>#'x</code>) means the following for
+the Scheme system: construct and return an identifier with the
+symbolic name <code>x</code> and with the lexical context at the place of the <code>x</code>
+appearing in the <code>syntax</code> form.  We have to be aware of that the term
+<code>identifier</code> can be used in two (slightly) different contexts: When we
+refer to <code>set!</code> as an identifier in the example above, we speak about
+a token being part of the code.  When we refer to the expression <code>#'x</code>
+evaluating to an identifier, we speak about a value of the language.
+The expression <code>#'x</code> contains an identifier in the first sense
+(speaking about the language) and evaluates to an identifier (as a
+value of the language).
+</p>
+
+<p>
+The procedure <code>syntax-&gt;datum</code> can be used to convert an identifier to
+a symbol, namely its underlying symbolic name:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(syntax-&gt;datum #'x)
+</pre>
+</div>
+
+<pre class="example" id="org3b1d4ef">
+x
+</pre>
+
+<p>
+There are no standard procedures that allow us to look up the binding
+of an identifier, but we can compare identifiers.  Scheme defines two
+equivalence relations, realized by the predicates <code>bound-identifier=?</code>
+and <code>free-identifier=?</code>.  Two identifiers are "<code>bound-identifier=?</code>"
+if they are interchangeable when they appear bound in the output of a
+macro.  Two identifiers are "<code>free-identifier=?</code>" if they are
+interchangeable when they appear free in the output of a macro.
+Neither equivalence implies the other.  It will become clearer in the
+course of this tutorial what this means, but some experiments will
+already give some understanding:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(list (bound-identifier=? #'x #'x) (bound-identifier=? #'x #'y))
+</pre>
+</div>
+
+<pre class="example" id="org51b9d25">
+(#t #f)
+</pre>
+
+<p>
+The two identifiers to which the two evaluations of <code>#'x</code> in the first
+argument to <code>list</code> evaluate are therefore "<code>bound-identifier=?</code>" while
+the differently named identifiers <code>#'x</code> and <code>#'y</code> (more precisely: the
+identifiers returned by these expressions) are not.  It is tempting to
+say that the two (or three) instances of <code>#'x</code> evaluate to the <i>same</i>
+identifier, but for this to make sense, some equivalence relation
+would have had to be fixed earlier.
+</p>
+
+<p>
+Let us now consider two simple examples for <code>free-identifier=?</code>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">let</span> ([x 1])
+  (free-identifier=? #'x #'x))
+</pre>
+</div>
+
+<pre class="example" id="orgd2cf450">
+#t
+</pre>
+
+<p>
+If the identifiers to both instances of <code>#'x</code> evaluate were inserted
+in the code as free identifiers they both would refer to the variable
+binding of the identifier <code>x</code> introduced by <code>let</code>.
+</p>
+
+<p>
+The second example is a bit more interesting:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">let</span> ([x 1]
+      [y 1])
+  (free-identifier=? #'x #'y))
+</pre>
+</div>
+
+<pre class="example" id="org91a61a6">
+#f
+</pre>
+
+<p>
+The answer is <code>#f</code> (for false) because although the values of the two
+variables <code>x</code> and <code>y</code> are both initialized to <code>1</code> they are bound to
+different locations in the store (which can be exhibited by mutating
+one of the two variables.
+</p>
+
+<p>
+So far, in all examples <code>bound-identifier=?</code> seems to give the same
+result as <code>free-identifier=?</code>.  That this is not true is shown in the
+next example.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">let</span> ([x 1])
+  (<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">outer-x</span> #'x)
+  (<span style="color: #a020f0;">let</span> ([x 2])
+    (<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">inner-x</span> #'x)
+    (list (bound-identifier=? outer-x inner-x)
+          (free-identifier=? outer-x inner-x))))
+</pre>
+</div>
+
+<pre class="example" id="orgaf9cbd2">
+(#t #f)
+</pre>
+
+<p>
+Inserting <code>inner-x</code> as a free identifier would not be equivalent to
+inserting <code>outer-x</code> because the former would refer to the binding of
+the variable with value <code>2</code> and the latter to the binding of the
+variable with value <code>1</code>.  Thus identifiers that are
+"<code>bound-identifier=?</code>" are not necessarily "<code>free-identifier</code>".  We
+hope that the connection of <code>free-identifier=?</code> to the second hygiene
+condition, the one about inserting free references to an identifier,
+is apparent.
+</p>
+
+<p>
+Again so far, it seems that identifiers are "<code>bound-identifier=?</code>" if
+and only if they have the same symbolic name.  One implication is
+correct, namely that identifiers that are interchangeable as bound identifiers
+must have the same symbolic name, but the other implication is not.  To show this, we have to employ a macro:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">let</span> ([x 1])
+  (<span style="color: #a020f0;">let-syntax</span>
+      ([outer-x (identifier-syntax #'x)])
+    (<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">inner-x</span> #'x)
+    (list (bound-identifier=? outer-x inner-x)
+          (free-identifier=? outer-x inner-x))))
+</pre>
+</div>
+
+<pre class="example" id="org46e6700">
+(#f #t)
+</pre>
+
+<p>
+Two remarks about the example code are in order before we discuss the
+result.  The binding form <code>let-syntax</code> is to <code>let</code> as <code>define-syntax</code>
+is to <code>define</code>; in other words, it allows us to locally bind keywords
+to macro (transformers).  Furthermore, we employ a short form of
+<code>identifier-syntax</code> here, which defines no <code>set!</code> semantics but just
+replaces an occurrence of the keyword <code>outer-x</code> with <code>#'x</code>.
+</p>
+
+<p>
+Both the identifier <code>x</code> in the definition of the macro <code>outer-x</code> and
+the identifier <code>x</code> in the definition of the variable <code>inner-x</code> refer
+to the binding of <code>x</code> introduced by the outer <code>let</code>, which explains
+that the values of <code>outer-x</code> and <code>inner-x</code> are "<code>free-identifier=?</code>".
+But they are not "<code>bound-identifier=?</code>", so this example shows that
+identifiers that "<code>free-identifier=?</code>" need not necessarily be
+"<code>bound-identifier=?</code>".
+</p>
+
+<p>
+The reason why they cannot be "<code>bound-identifier=?</code>" is that the first
+hygiene condition about inserting bindings for an identifier would be
+violated otherwise.  Consider the following example:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">let-syntax</span>
+    ([add1
+      (<span style="color: #a020f0;">syntax-rules</span> ()
+        [(add1 y)
+         (<span style="color: #a020f0;">let</span> ([x 1])
+           (+ x y))])])
+  (<span style="color: #a020f0;">let</span> ([x 2])
+    (add1 x)))
+</pre>
+</div>
+
+<pre class="example" id="org6c4f4de">
+3
+</pre>
+
+<p>
+The identifier <code>x</code> appearing in the macro template is inserted as a
+bound identifier in the macro output and thus is in effect renamed to
+avoid conflict with the identifier <code>x</code> appearing in the macro use.
+Renaming means that the two identifiers named <code>x</code> cannot be
+"<code>bound-identifier=?</code>" because they would otherwise be interchangeable
+as bound identifiers.
+</p>
+
+<p>
+Scheme implements this hygiene condition by assigning to identifiers
+besides their symbolic name and their lexical context another
+property, namely their historic context (or just history)<sup><a id="fnr.7" class="footref" href="#fn.7" role="doc-backlink">7</a></sup>.  The
+history of an identifier is the information when the identifier was
+first introduced in the program.  All identifiers in the program
+source have the same history &#x2014; they were already there when the
+program was started.  An identifier introduced by a macro
+transformation (as part of its output) has a different history than
+identifiers that were already present in the program source.
+Identifiers introduced by different macro transformations have
+different histories and all identifiers introduced by the same macro
+transformation have the same history.
+</p>
+
+<p>
+Let us take another view at this example:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">let</span> ([x 1])
+  (<span style="color: #a020f0;">let-syntax</span>
+      ([outer-x (identifier-syntax #'x)])
+    (<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">inner-x</span> #'x)
+    (list (bound-identifier=? outer-x inner-x)
+          (free-identifier=? outer-x inner-x))))
+</pre>
+</div>
+
+<pre class="example" id="orgb93ffc4">
+(#f #t)
+</pre>
+
+<p>
+The identifier <code>x</code> appears three times in the source.  All three
+identifiers have the same history.  When the macro <code>outer-x</code> is
+expanded, the identifier <code>x</code> is introduced in the macro output (as
+part of the expression <code>#'x</code>) and this particular identifier was not
+part of the macro input, so the introduced identifier <code>x</code> has a
+different history than the identifier to which <code>inner-x</code> is bound.
+</p>
+
+<p>
+We are now in a situation to give alternative definitions for
+<code>bound-identifier=?</code> and <code>free-identifier=?</code>: Two identifiers are
+"<code>bound-identifier=?</code>" if they have the same symbolic name and the
+same history.  Two identifiers are "<code>free-identifier=?</code>" if they refer
+to the same binding in their respective lexical contexts.  (An unbound
+identifier is, by definition, "<code>free-identifier=?</code>" to another
+identifier if the other identifier is also unbound and has the same
+symbolic name.)
+</p>
+
+<p>
+Scheme also allows to fudge identifiers.  The procedure
+<code>datum-&gt;syntax</code> can turn a symbol into an identifier with that
+symbolic name.  For that, the user has to provide a lexical context
+and a history.  This is done by giving a "template" identifier from
+which the context is taken.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">let</span> ([x 1])
+  (<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">outer-x</span> #'x)
+  (<span style="color: #a020f0;">let</span> ([x 2])
+    (<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">outer</span> (datum-&gt;syntax outer-x 'x))
+    (list (bound-identifier=? outer-x outer)
+          (free-identifier=? outer-x outer))))
+</pre>
+</div>
+
+<pre class="example" id="orgc752521">
+(#t #t)
+</pre>
+
+<p>
+In this example, the identifier <code>outer</code> is an identifier with the
+symbolic name <code>x</code> and with the context as if it was introduced where
+<code>x</code> appears in the definition of <code>outer-x</code>.
+</p>
+
+<p>
+In the following example, the fudged identifier with the symbolic name
+<code>y</code> has the same history as the identifier <code>x</code> appearing the macro use
+of <code>as-y</code>, and thus the same history as the identifier <code>y</code> appearing
+in the call to <code>bound-identifier=?</code>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">let-syntax</span>
+    ([as-y
+      (<span style="color: #a020f0;">syntax-rules</span> ()
+        [(as-y x) (datum-&gt;syntax #'x 'y)])])
+  (bound-identifier=? #'y (as-y x)))
+</pre>
+</div>
+
+<pre class="example" id="org4454fde">
+#t
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org309a120" class="outline-3">
+<h3 id="org309a120"><span class="section-number-3">5.2.</span> Constructing syntax objects</h3>
+<div class="outline-text-3" id="text-5-2">
+<p>
+In the previous section we learned that Scheme code cannot be
+represented by a Scheme datum value (a Scheme value that has a written
+representation like a list, a number, or a symbol), at least not
+during the expansion process, as identifiers cannot be represented by
+symbols.
+</p>
+
+<p>
+The objects that do represent Scheme forms are called <i>syntax
+objects</i>.  The basic idea is that a syntax object is like a datum
+value but with identifiers instead of symbols.  So a list of
+identifiers or a vector of a number and an identifier, or a single
+string or identifier are all syntax objects.  Moreover, there can be a
+<i>wrap</i> around a nonidentifier syntax object.
+</p>
+
+<p>
+Formally, syntax objects can inductively be defined as follows:
+</p>
+
+<ul class="org-ul">
+<li>A nonpair, nonvector, or nonsymbol value is a syntax object.</li>
+<li>A pair of syntax objects is a syntax object.</li>
+<li>A vector of syntax objects is a syntax object.</li>
+<li>An identifier is a syntax object.</li>
+<li>A wrapped nonpair, nonvector, or nonsymbol value is a syntax object.</li>
+<li>A wrapped pair or vector of syntax objects is a syntax object.</li>
+</ul>
+
+<p>
+To each syntax object corresponds a (datum) value by stripping all
+wraps and converting all identifiers to their symbolic names.  The
+Scheme procedure that does this conversion is <code>syntax-&gt;datum</code>.  We
+have already seen it converting identifiers to symbols.  It is also
+used in effect by the <code>quote</code> special form: When Scheme evaluates an
+expression like <code>(quote (1 2 foo))</code>, the (internal) procedure
+responsible for expanding or evaluating this expression will receive a
+syntax object whose underlying datum value is <code>(1 2 foo)</code> and will
+evaluate to this underlying value.
+</p>
+
+<p>
+We can construct the syntax object in the above example as a Scheme value:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(list 1 2 #'foo)
+</pre>
+</div>
+
+<pre class="example" id="org58fb666">
+(1 2 #&lt;syntax foo&gt;)
+</pre>
+
+<p>
+It is a syntax object because it is a list of syntax objects (and
+Scheme lists are built from pairs and the empty list) and it has the
+expected corresponding (datum) value:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(syntax-&gt;datum (list 1 2 #'foo))
+</pre>
+</div>
+
+<pre class="example" id="org61cf19e">
+(1 2 foo)
+</pre>
+
+<p>
+The predicate <code>identifier?</code> is a Scheme procedure that can be used to
+test whether a syntax object is an identifier or not:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(list (identifier? 1) (identifier? (list #'x)) (identifier? #'x))
+</pre>
+</div>
+
+<pre class="example" id="org6020b51">
+(#f #f #t)
+</pre>
+
+<p>
+In the previous section, we saw how to use <code>syntax</code> keyword
+(abbreviated by <code>#'</code>) can be used to create identifiers.  In fact, the
+argument to the <code>syntax</code> keyword does not have to be symbol but can be
+any datum, so a <code>syntax</code> expression can be used to build more
+complicated syntax objects:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">syntax</span> (1 2 foo))
+</pre>
+</div>
+
+<pre class="example" id="orgdb4c831">
+#&lt;syntax (1 2 foo)&gt;
+</pre>
+
+<p>
+As the result shows, this is a wrapped syntax object, namely a wrapped
+list (of syntax objects).  The Scheme system uses the wrap to attach
+source location information to the syntax object (facilitating
+debugging), and the expander makes use of the fact that syntax objects
+can be opaque (wrapped) to provide optimal algorithmic complexity for
+the expansion process.
+</p>
+
+<p>
+Whether wrapped or not, we can apply <code>syntax-&gt;datum</code> on this syntax object:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(syntax-&gt;datum #'(1 2 foo))
+</pre>
+</div>
+
+<pre class="example" id="orgda34f40">
+(1 2 foo)
+</pre>
+
+<p>
+Here, we used again the abbreviation <code>#'</code> for <code>syntax</code>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org5561fb8" class="outline-3">
+<h3 id="org5561fb8"><span class="section-number-3">5.3.</span> Destructing syntax objects</h3>
+<div class="outline-text-3" id="text-5-3">
+<p>
+The syntax object returned by <code>#'(1 2 foo)</code> cannot be destructed using
+list procedures like <code>car</code> and <code>cdr</code> although it represents a list as
+it is wrapped.  Scheme offers a special form, <code>syntax-case</code> to
+destruct syntax objects.  A <code>syntax-case</code> form contains clauses, each
+consisting of a pattern of the form we already saw in connection with
+<code>syntax-rules</code> and an expression.  An input syntax object is matched
+against the patterns in order and the expression corresponding to the
+first pattern that matches is evaluated:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">syntax-case</span> #'(1 2 foo) ()
+  [(a b) 'case-1]
+  [(a b (c d)) 'case-2]
+  [(2 b c) 'case-3]
+  [(a b c d e ...) 'case-4]
+  [(a b c) 'case-5]
+  [x 'case-6])
+</pre>
+</div>
+
+<pre class="example" id="org4a267d2">
+case-5
+</pre>
+
+<p>
+(The empty list <code>()</code> appearing in the second argument of <code>syntax-case</code>
+will be explained soon and plays the same role as the empty list we
+saw in our <code>syntax-rules</code> examples.)
+</p>
+
+<p>
+The pattern of the last clause would have also matched but the
+matching ends as soon as a matching clause (the fifth in this
+example) is found.  (The system will raise an exception if no match
+can be found.)
+</p>
+
+<p>
+Let us try to distinguish the syntax objects returned by <code>#'(1 2 foo)</code> and <code>#'(1 2 bar)</code>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">syntax-case</span> #'(1 2 foo) ()
+  [(a b bar) 'bar]
+  [(a b foo) 'foo])
+</pre>
+</div>
+
+<pre class="example" id="orgf107533">
+bar
+</pre>
+
+<p>
+That we don't get the expected (or hoped for) result is because
+<code>syntax-case</code> (as <code>syntax-rules</code>) does treat every identifier
+appearing in a pattern as a pattern variable by default.  Thus, in the
+first pattern, <code>bar</code> is not matched against <code>foo</code> but <code>bar</code> is bound
+to <code>foo</code>.  We can change this behavior by adding the identifiers that
+we want to match literally to the list that appeared as the empty list
+so far:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">syntax-case</span> #'(1 2 foo) (bar foo)
+  [(a b bar) 'bar]
+  [(a b foo) 'foo])
+</pre>
+</div>
+
+<pre class="example" id="org10fca8d">
+foo
+</pre>
+
+<p>
+The equivalence predicate that <code>syntax-case</code> uses to compare an input
+identifier against a literal identifier is <code>free-identifier=?</code>.  In
+the case of the example, both <code>bar</code> and <code>foo</code> are unbound and we
+recall that unbound identifiers are "<code>free-identifier=?</code>" if and only
+if they have the same symbolic name.  The next example demonstrates
+how the binding comes into play:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">let</span> ([foo 1])
+  (<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">input</span>
+    (<span style="color: #a020f0;">let</span> ([foo 2])
+      #'(1 2 foo)))
+  (<span style="color: #a020f0;">syntax-case</span> input (foo)
+    [(a b foo) 'match]
+    [(a b c) 'no-match]))
+</pre>
+</div>
+
+<pre class="example" id="orgfb2589c">
+no-match
+</pre>
+
+<p>
+We have now the tool to dispatch on the structure of a syntax object,
+but what we also need is a way to get hold of the individual
+components of a syntax object.  This is done with pattern variables
+(<code>a</code>, <code>b</code>, and <code>c</code> in the example above).  We said above that a
+pattern variable is bound to the syntax object it is matched against.
+This scope of this binding is the expression following the pattern in
+the <code>syntax-case</code> clause.  Just a keywords are not ordinary variables,
+pattern variables are neither.  They may only be referenced inside the
+<code>syntax</code> form as in the following example:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">syntax-case</span> #'(1 x) ()
+  [(1 y) #'y])
+</pre>
+</div>
+
+<pre class="example" id="org126da23">
+#&lt;syntax x&gt;
+</pre>
+
+<p>
+Here, <code>#'y</code> does not resolve to the identifier <code>y</code> (because <code>y</code> is
+bound to a pattern variable) but to the syntax object to which <code>y</code> is
+bound, which is the value of <code>#'(1 x)</code>.
+</p>
+
+<p>
+Mixing of pattern variables and non-pattern variable identifiers in
+the same <code>syntax</code> expression also works:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">syntax-case</span> #'(1 x) ()
+  [(1 a) #'(b a)])
+</pre>
+</div>
+
+<pre class="example" id="org6b6badb">
+(#&lt;syntax b&gt; #&lt;syntax x&gt;)
+</pre>
+
+<p>
+As one can see, the result is not a wrapped syntax object but a list
+of two syntax objects.  This is no coincidence.  When a pattern
+variable appears in a <code>syntax</code> template, all the substructure in which
+the pattern variable is replaced by what it was matched against, is
+unwrapped, so ordinary list and vector accessor procedures can be
+used.  The following is another example:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">syntax-case</span> #'(1 2 3) ()
+  [(1 x ...) #'(a x ... b c)])
+</pre>
+</div>
+
+<pre class="example" id="orgac5a2bd">
+(#&lt;syntax a&gt; #&lt;syntax 2&gt; #&lt;syntax 3&gt; . #&lt;syntax (b c)&gt;)
+</pre>
+
+<p>
+As can be seen, the pattern variable <code>x</code> is matched against the list
+of syntax objects consisting of <code>2</code> and <code>3</code>.  Up to the part (and
+including it) where <code>x</code> is substituted, the syntax object is
+unwrapped.  The ellipsis in the <code>syntax</code> template works as the
+ellipsis in the <code>syntax-rules</code> templates (we will see below why this
+is no coincidence).
+</p>
+
+<p>
+In particular, we can use list procedures to reference
+individual elements or to calculate lengthes:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">syntax-length</span>
+  (<span style="color: #a020f0;">lambda</span> (stx)
+    (<span style="color: #a020f0;">syntax-case</span> stx ()
+      [(x ...)
+       (length #'(x ...))])))
+
+(syntax-length #'(a b c d))
+</pre>
+</div>
+
+<pre class="example" id="org63ee979">
+4
+</pre>
+
+<p>
+We have already seen how literals in <code>syntax-case</code> can be used for
+literal matching of identifiers (using <code>free-identifier=?</code>).
+Otherwise, <code>syntax-case</code> only matches per structure.  If we want to
+match structural element using special rules, <i>fenders</i> can be used as
+in the following example:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">syntax-case</span> #'(<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">3</span> (+ 1 2)) ()
+  [(<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">id</span> expr)
+   (identifier? #'id)
+   'ok]
+  [_ 'error])
+</pre>
+</div>
+
+<pre class="example" id="org6808f87">
+error
+</pre>
+
+<p>
+The fender is the expression between the pattern and the final
+expression in the first clause of <code>syntax-rules</code>.  If present, it is
+evaluated when the pattern matches.  If the evaluation yields <code>#f</code>,
+this clause is skipped and matching is continued with the next clause.
+The scope of the pattern variables of a pattern includes a fender if
+present.
+</p>
+
+<p>
+The (sub)pattern <code>_</code> matches anything (like a pattern variable) but
+does not bind a pattern variable.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org1667c01" class="outline-2">
+<h2 id="org1667c01"><span class="section-number-2">6.</span> Syntax-case macros</h2>
+<div class="outline-text-2" id="text-6">
+</div>
+<div id="outline-container-orgcd989aa" class="outline-3">
+<h3 id="orgcd989aa"><span class="section-number-3">6.1.</span> Macro transformers</h3>
+<div class="outline-text-3" id="text-6-1">
+<p>
+We started this tutorial with writing macros and discussing a number
+of some example of such macros.  Somehow, we seemed to have deviated
+by talking about identifiers, syntax objects, and their construction
+and destruction.  In this section we will see how <code>syntax-case</code> and
+<code>syntax</code> can be employed to write powerful macros.  In fact, they are
+the building blocks of macro transformers.
+</p>
+
+<p>
+To make use of the forms <code>syntax-case</code> and <code>syntax</code>, we have to
+understand what actually goes into a <code>define-syntax</code> definition.  The
+general form of a syntax definition is <code>(define-syntax identifier
+transformer-expression)</code> (the analogous holds for bindings in a
+<code>let-syntax</code> expression).  When the Scheme expanders encounters a
+<code>define-syntax</code> definition, it evaluates the <code>transformer-expression</code>,
+which is an ordinary Scheme expression.  It's value must be a macro
+transformer, which is then bound to the keyword given by <code>identifier</code>.
+</p>
+
+<p>
+Now, a macro transformer is just an ordinary Scheme procedure taking
+one argument, a syntax object, and returning one value, another syntax
+object.  The input syntax object represents the macro use form, the
+output syntax object represents the transcribed macro use.  Let us
+check this:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">let</span> ([x 41])
+  (<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">always-42</span>
+    (<span style="color: #a020f0;">lambda</span> (stx)
+      (<span style="color: #a020f0;">syntax</span> (+ 1 x))))
+
+  (+ always-42
+     (always-42 400)))
+</pre>
+</div>
+
+<pre class="example" id="org98b684e">
+84
+</pre>
+
+<p>
+Independently of how the macro is used &#x2014; that is, independently of
+what <code>stx</code> is &#x2014;, the macro transformer of this example always
+returns the expression <code>(+ 1 x)</code> (evaluating to <code>42</code>).  Note that we
+could have equivalently written <code>#'(+ 1 x)</code> instead of <code>syntax</code>.
+</p>
+
+<p>
+If we want to make the macro output dependent on the macro input, we
+have to employ <code>syntax-case</code> to destruct the input syntax object.  Let
+us first define a macro transformer that uses <code>syntax-case</code>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">f</span>
+  (<span style="color: #a020f0;">lambda</span> (stx)
+    (<span style="color: #a020f0;">syntax-case</span> stx ()
+      [(_ x ...)
+       (list #'quote (list (length #'(x ...)) #'(x ...)))])))
+</pre>
+</div>
+
+<p>
+We can test this procedure as any other procedure:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(f #'(q a b c))
+</pre>
+</div>
+
+<pre class="example" id="org2fc6ef2">
+(#&lt;syntax quote&gt; (3 (#&lt;syntax a&gt; #&lt;syntax b&gt; #&lt;syntax c&gt;)))
+</pre>
+
+<p>
+The output is thus a syntax object of the form <code>(quote (n x ...))</code>
+where the <code>x</code> denote the arguments following the head element of the
+syntax object argument to <code>f</code> and <code>n</code> is the number of these
+arguments.  The expression that yields the syntax object in the
+procedure <code>f</code> above is not very readable.  Because of that, Scheme
+also offer a <code>quasisyntax</code> form (abbreviated with <code>#`</code>), which is to
+<code>syntax</code> as <code>quasiquote</code> is to <code>quote</code>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">f</span>
+  (<span style="color: #a020f0;">lambda</span> (stx)
+    (<span style="color: #a020f0;">syntax-case</span> stx ()
+      [(_ x ...)
+       #`(quote (#,(length #'(x ...)) x ...))])))
+</pre>
+</div>
+
+<p>
+Even more readable becomes the expression if pattern variables are
+used, which can not only be bound by <code>syntax-case</code> but also by
+<code>with-syntax</code>, which is for pattern variables what <code>let</code> is for
+ordinary variables:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">f</span>
+  (<span style="color: #a020f0;">lambda</span> (stx)
+    (<span style="color: #a020f0;">syntax-case</span> stx ()
+      [(_ x ...)
+       (with-syntax ([n (length #'(x ...))])
+         #'(quote (n x ...)))])))
+</pre>
+</div>
+
+<p>
+In fact, <code>with-syntax</code> is not a primitive form but can be expressed in
+terms of <code>syntax-case</code>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">with-syntax</span>
+  (<span style="color: #a020f0;">syntax-rules</span> ()
+    [(with-syntax ([p e0] ...) e1 ... e2)
+     (<span style="color: #a020f0;">syntax-case</span> (list e0 ...) ()
+       [(p ...)
+        (<span style="color: #a020f0;">let</span> ()
+          e1 ... e2)])]))
+</pre>
+</div>
+
+<p>
+In whatever way we write the procedure <code>f</code>, we can then use it to
+define an actual macro:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">quote/length</span> f)
+</pre>
+</div>
+
+<p>
+Of course, instead of naming the macro transformer and just
+referencing to it in the right hand side of <code>define-syntax</code>, we could
+have equally well written the transformer procedure expression inline.
+The advantage of the former is that the transformer procedure can then
+be easily tested using the usual tools, the advantage of the latter is
+that it is more compact<sup><a id="fnr.8" class="footref" href="#fn.8" role="doc-backlink">8</a></sup>.
+</p>
+
+<p>
+Let's test our macro:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(quote/length a b c)
+</pre>
+</div>
+
+<pre class="example" id="org4ec9da5">
+(3 a b c)
+</pre>
+
+<p>
+It should be noted that the calculation of the length, <code>3</code> in this
+case, happens at expand-time (so in the compiler if we use one).  In
+fact, a macro can be understood as a compiler for a sublanguage and
+that is be plugged into the Scheme system to extend the language.
+</p>
+
+<p>
+We now have amassed enough knowledge to give the definition of
+<code>syntax-rules</code>.  As the right hand side of <code>define-syntax</code> expects a
+procedure expression, a <code>syntax-rules</code> form must evaluate to a
+procedure.  And, in fact, <code>syntax-rules</code> can be defined as follows:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">syntax-rules</span>
+  (<span style="color: #a020f0;">lambda</span> (stx)
+    (<span style="color: #a020f0;">syntax-case</span> stx ()
+      [(_ (lit ...) [(k . p) t] ...)
+       (for-all identifier? #'(lit ... k ...))
+       #'(<span style="color: #a020f0;">lambda</span> (x)
+           (<span style="color: #a020f0;">syntax-case</span> x (lit ...)
+             [(_ . p) #'t] ...))])))
+</pre>
+</div>
+
+<p>
+The <code>syntax</code> expression following the fender of the <code>syntax-case</code>
+clause shows that a <code>syntax-rules</code> expression evaluates to a
+procedure.  There is another instance of <code>syntax</code> (<code>#'</code>) within the
+template of the outer <code>syntax</code> expression.  This is because procedure
+to which a <code>syntax-rules</code> expression evaluates outputs itself a syntax
+object.
+</p>
+
+<p>
+One more thing is remarkable:  Each <code>syntax-rules</code> pattern is of the
+form <code>(k . p)</code>; more precisely, it can only match (syntax) pairs whose
+head element is an identifier, that is macro uses of exactly this
+form.  Notably, the pattern variable <code>k</code> isn't referenced in the
+output.  This is because a <code>syntax-rules</code> pattern ignores the pattern
+variable that corresponds to the keyword position.  In particular, the
+following two syntax definitions are equivalent:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">incr!</span>
+  (<span style="color: #a020f0;">syntax-rules</span> ()
+    [(incr! x) (<span style="color: #a020f0;">set!</span> x (+ x 1))]))
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">incr!</span>
+  (<span style="color: #a020f0;">syntax-rules</span> ()
+    [(_ x) (<span style="color: #a020f0;">set!</span> x (+ x 1))]))
+</pre>
+</div>
+
+<p>
+This is in contrast to a <code>syntax-case</code> expression, which doesn't tread
+the keyword position in a special way.  This is the reason why we
+often use <code>_</code> at the keyword position in <code>syntax-case</code> expressions for
+macro transformers.
+</p>
+
+<p>
+It is a good time to finally give the definition of our initial
+<code>incr!</code> macro in terms of <code>syntax-case</code>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">incr!</span>
+  (<span style="color: #a020f0;">lambda</span> (stx)
+    (<span style="color: #a020f0;">syntax-case</span> stx ()
+      [(_ x)
+       (identifier? #'x)
+       #'(<span style="color: #a020f0;">set!</span> x (+ x 1))])))
+</pre>
+</div>
+
+<p>
+It is instructive to go through the above definition of the
+<code>syntax-rules</code> keyword and see how the earlier definition using
+<code>syntax-rules</code> expands into the later definition using <code>syntax-case</code>.
+The only line that is not present with the <code>syntax-rules</code> definition
+is the fender <code>(identifier #'x)</code>, which has no equivalent for
+<code>syntax-rules</code>.  This fender ensures that a syntax error is reported
+early if the user tries to use this macro in a non-sensible form like
+in <code>(incr! 2)</code>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org1c32d41" class="outline-3">
+<h3 id="org1c32d41"><span class="section-number-3">6.2.</span> A fluid <code>let</code></h3>
+<div class="outline-text-3" id="text-6-2">
+<p>
+We should finally move past the <code>incr!</code> macro.  We already remarked
+that mutation (which <code>incr!</code> does) is frowned upon.  To be more
+precise, what makes problems is mutation with unlimited extent.
+Mutation with dynamic extent, on the other hand, can be used to
+implement dynamically scoped variables, which are also called fluids
+and do not have all the problems associated with unbound mutation.
+</p>
+
+<p>
+It is probably best to explain it with an example.  For this, we
+define a new binding-like construct, named <code>fluid-let</code><sup><a id="fnr.9" class="footref" href="#fn.9" role="doc-backlink">9</a></sup>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">fluid-let</span>
+  (<span style="color: #a020f0;">lambda</span> (stx)
+    (<span style="color: #a020f0;">syntax-case</span> stx ()
+      [(_ [(x e)] b1 ... b2)
+       (identifier? #'x)
+       #'(<span style="color: #a020f0;">let</span> ([y e])
+           (<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">swap!</span>
+             (<span style="color: #a020f0;">lambda</span> ()
+               (<span style="color: #a020f0;">let</span> ([t x])
+                 (<span style="color: #a020f0;">set!</span> x y)
+                 (<span style="color: #a020f0;">set!</span> y t))))
+           (dynamic-wind
+             swap!
+             (<span style="color: #a020f0;">lambda</span> ()
+               b1 ... b2)
+             swap!))])))
+</pre>
+</div>
+
+<p>
+Let us briefly check the output of the following expression:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">let</span> ([x 1])
+  (<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">show</span>
+    (<span style="color: #a020f0;">lambda</span> ()
+      (display x)
+      (newline)))
+  (show)
+  (<span style="color: #a020f0;">fluid-let</span> ([x 2])
+    (show))
+  (show))
+</pre>
+</div>
+
+<p>
+The <code>dynamic-wind</code> procedure takes three thunks (procedures that take
+no arguments) as arguments.  When <code>dynamic-wind</code> is called, it calls
+the three thunks in that order and finally returns the results of the
+call to the second, the middle, thunk.  The reason why we didn't write
+<code>(begin (swap!) ((lambda () b1 ... b2)) (swap!))</code> is that
+<code>dynamic-wind</code> arranges for calling the enter and exit thunk even in
+the presence of non-local control flow<sup><a id="fnr.10" class="footref" href="#fn.10" role="doc-backlink">10</a></sup>.
+</p>
+
+<p>
+The variable <code>y</code> is used by the macro to store the old value of <code>var</code>
+in it before the latter is mutated.  As <code>y</code> does not come from the
+macro input, it won't conflict with the definition of an identifier
+named <code>y</code> surrounding the use of <code>fluid-let</code>.  Likewise, the temporary
+variable <code>t</code> won't conflict regardless of what variable the pattern
+variable <code>x</code> stands for.
+</p>
+
+<p>
+Our <code>fluid-let</code> can "bind" exactly one variable.  If we want to change
+more than value, say two, we have to rewrite our macro:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">fluid-let</span>
+  (<span style="color: #a020f0;">lambda</span> (stx)
+    (<span style="color: #a020f0;">syntax-case</span> stx ()
+      [(_ [(x1 e1) (x2 e2)] b1 ... b2)
+       (for-all identifier? #'(x1 x2))
+       #'(<span style="color: #a020f0;">let</span> ([y1 e1] [y2 e2])
+           (<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">swap!</span>
+             (<span style="color: #a020f0;">lambda</span> ()
+               (<span style="color: #a020f0;">let</span> ([t x1])
+                 (<span style="color: #a020f0;">set!</span> x1 y1)
+                 (<span style="color: #a020f0;">set!</span> y1 t))
+               (<span style="color: #a020f0;">let</span> ([t x2])
+                 (<span style="color: #a020f0;">set!</span> x2 y2)
+                 (<span style="color: #a020f0;">set!</span> y2 t))))
+           (dynamic-wind
+             swap!
+             (<span style="color: #a020f0;">lambda</span> ()
+               b1 ... b2)
+             swap!))])))
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">let</span> ([a 1] [b 2])
+  (<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">show</span>
+    (<span style="color: #a020f0;">lambda</span> ()
+      (display (list a b))
+      (newline)))
+  (show)
+  (<span style="color: #a020f0;">fluid-let</span> ([a 3] [b 4])
+    (show))
+  (show))
+</pre>
+</div>
+
+<p>
+This is, of course, a non-solution because we still can't pass three
+variables and have also lost the ability of just passing one
+variable.  Possibly, the ellipsis can help as in the following
+attempt:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">fluid-let</span>
+  (<span style="color: #a020f0;">lambda</span> (stx)
+    (<span style="color: #a020f0;">syntax-case</span> stx ()
+      [(_ [(x e) ...] b1 ... b2)
+       (for-all identifier? #'(x ...))
+       #'(<span style="color: #a020f0;">let</span> ([y e] ...)
+           (<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">swap!</span>
+             (<span style="color: #a020f0;">lambda</span> ()
+               (<span style="color: #a020f0;">let</span> ([t x])
+                 (<span style="color: #a020f0;">set!</span> x y)
+                 (<span style="color: #a020f0;">set!</span> y t))
+              ...))
+           (dynamic-wind
+             swap!
+             (<span style="color: #a020f0;">lambda</span> ()
+               b1 ... b2)
+             swap!))])))
+</pre>
+</div>
+
+<p>
+However, this won't quite work.  The problem is that there is only one
+identifier <code>y</code> introduced and not one identifier per each fluid
+variable.  The canonical solution Scheme offers here is the
+<code>generate-temporaries</code> procedure, which takes a list or a syntax
+object representing a list and returns a list of as many identifiers,
+each with its unique history so that they won't be pairwise
+"<code>bound-identifier=?</code>" or to any other identifier:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(with-syntax ([(x y) (generate-temporaries '(a b))])
+  (list (identifier? #'x)
+        (identifier? #'y)
+        (bound-identifier=? #'x #'y)))
+</pre>
+</div>
+
+<p>
+Here, the list <code>(a b)</code> has two elements, so <code>generate-temporaries</code>
+creates two identifiers, which we bound using <code>with-syntax</code> to the
+pattern variables <code>x</code> and <code>y</code>.
+</p>
+
+<p>
+With this tool at our disposal, we can finally write a version of
+<code>fluid-let</code> that works with an arbitrary number of variables:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">fluid-let</span>
+  (<span style="color: #a020f0;">lambda</span> (stx)
+    (<span style="color: #a020f0;">syntax-case</span> stx ()
+      [(_ [(x e) ...] b1 ... b2)
+       (for-all identifier? #'(x ...))
+       (with-syntax
+           ([(y ...) (generate-temporaries #'(x ...))])
+         #'(<span style="color: #a020f0;">let</span> ([y e] ...)
+             (<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">swap!</span>
+               (<span style="color: #a020f0;">lambda</span> ()
+                 (<span style="color: #a020f0;">let</span> ([t x])
+                   (<span style="color: #a020f0;">set!</span> x y)
+                   (<span style="color: #a020f0;">set!</span> y t))
+                 ...))
+             (dynamic-wind
+               swap!
+               (<span style="color: #a020f0;">lambda</span> ()
+                 b1 ... b2)
+               swap!))]))))
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">let</span> ([a 1] [b 2])
+  (<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">show</span>
+    (<span style="color: #a020f0;">lambda</span> ()
+      (display (list a b))
+      (newline)))
+  (show)
+  (<span style="color: #a020f0;">fluid-let</span> ([a 3] [b 4])
+    (show))
+  (show))
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org69aff37" class="outline-3">
+<h3 id="org69aff37"><span class="section-number-3">6.3.</span> Implementing a variant type in Scheme</h3>
+<div class="outline-text-3" id="text-6-3">
+<p>
+It is time to demonstrate more involved macros to highlight some
+features of the Scheme macro system and how it leads to extensibility
+of the language.
+</p>
+
+<p>
+To have some use case at hand, let us assume that we deal with binary
+trees that carry a value at each (internal) node and at each leaf.  We
+can use the Scheme record facility to provide the necessary data
+types, implementing an abstract tree interface:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define-record-type</span> node (fields left value right))
+(<span style="color: #a020f0;">define-record-type</span> leaf (fields value))
+</pre>
+</div>
+
+<p>
+We can build a tree using the constructors defined by the above
+record-type definitions:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">t</span>
+  (make-node
+   (make-node (make-leaf 4) 2 (make-leaf 1))
+   8
+   (make-leaf -1)))
+</pre>
+</div>
+
+<p>
+While creating a tree by hand in this way is doable, it is not very
+neat.  It would be nice if we could give the tree above in simple,
+parenthesized syntax as follows:
+</p>
+<div class="org-src-container">
+<pre class="src src-scheme">(((4)
+  2
+  (1))
+ 8
+ (-1))
+</pre>
+</div>
+
+<p>
+In other words, (internal) nodes are given by lists of three elements,
+and leafs by lists of one element.  To achieve this, one might want to
+write a procedure as the following one:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">make-tree</span>
+  (<span style="color: #a020f0;">lambda</span> (e)
+    (<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">n</span> (length e))
+    (<span style="color: #a020f0;">cond</span>
+     [(= n 3)
+      (make-node (make-tree (car e))
+                 (cadr e)
+                 (make-tree (caddr e)))]
+     [(= n 1) (make-leaf (car e))]
+     [<span style="color: #a020f0;">else</span>
+      (assert #f)])))
+</pre>
+</div>
+
+<p>
+We can then build our tree <code>t</code> as follows:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">t</span>
+  (make-tree
+   '(((4)
+      2
+      (1))
+     8
+     (-1))))
+</pre>
+</div>
+
+<p>
+The <code>quote</code> (necessary so that Scheme does not try to evaluate our
+tree description as an expression) is not optimal, but we can write a
+macro that inserts the quote for us:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">tree</span>
+  (<span style="color: #a020f0;">syntax-rules</span> ()
+    [(tree datum)
+     (make-tree 'datum)]))
+</pre>
+</div>
+
+<p>
+With this macro, we can now build our tree with the following syntax:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">t</span>
+  (tree
+   (((4)
+      2
+      (1))
+     8
+     (-1))))
+</pre>
+</div>
+
+<p>
+While this is optimal as far as the flexibility in syntax is
+concerned, the solution is inferior to our original approach of
+building the tree by calling the constructors <code>make-node</code> and
+<code>make-leaf</code> by hand.  The point is that the procedure <code>make-tree</code>,
+which is called in the output of the macro <code>tree</code>, walks the tree
+expression at run time and so is not as efficient as the original
+approach.  What we want is that the tree expression is analyzed during
+compile time.  As macros are nothing but small compilers, it is no
+surprise that a macro will help.  All we have to do is to rewrite the
+<code>tree</code> macro that it doesn't output a call to <code>make-tree</code> but that it
+directly outputs calls to <code>make-node</code> and <code>make-leaf</code>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">tree</span>
+  (<span style="color: #a020f0;">syntax-rules</span> ()
+    [(tree (left value right))
+     (make-node (tree left) value (tree right))]
+    [(tree (value))
+     (make-leaf value)]))
+</pre>
+</div>
+
+<p>
+The tree can be built as before:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">t</span>
+  (tree
+   (((4)
+      2
+      (1))
+     8
+     (-1))))
+</pre>
+</div>
+
+<p>
+Now let us do something with the tree.  For example, we can ask for
+the sum of all values in the tree nodes, internal and leaf nodes:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">tree-accumulate</span>
+   (<span style="color: #a020f0;">lambda</span> (t)
+     (<span style="color: #a020f0;">cond</span>
+      [(node? t)
+       (+ (tree-accumulate (node-left t))
+          (node-value t)
+          (tree-accumulate (node-right t)))]
+      [(leaf? t)
+       (leaf-value t)]
+      [<span style="color: #a020f0;">else</span> (assert #f)])))
+</pre>
+</div>
+
+<p>
+We can test the procedure with our example tree:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(tree-accumulate t)
+</pre>
+</div>
+
+<p>
+We have used Scheme's general <code>cond</code> expression to dispatch on the two
+possible types of trees.  Compared to pattern matchers of other
+languages, this also does not deserve the attribute neat.  What we
+would like is to have a syntax so that we can write <code>tree-accumulate</code>
+as follows:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">tree-accumulate</span>
+  (<span style="color: #a020f0;">lambda</span> (t)
+    (tree-case t
+     [(node left value right)
+      (+ (tree-accumulate left)
+         value
+         (tree-accumulate right))]
+     [(leaf value)
+      value])))
+</pre>
+</div>
+
+<p>
+Obviously, this calls for another macro!
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">tree-case</span>
+  (<span style="color: #a020f0;">lambda</span> (stx)
+    (<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">parse-clause</span>
+      (<span style="color: #a020f0;">lambda</span> (cl)
+        (<span style="color: #a020f0;">syntax-case</span> cl (node leaf)
+          [[(node left value right) e1 ... e2]
+           #'[(node? tmp)
+              (<span style="color: #a020f0;">let</span> ([left (node-left tmp)]
+                    [value (node-value tmp)]
+                    [right (node-right tmp)])
+                e1 ... e2)]]
+          [[(leaf value) e1 ... e2]
+           #'[(leaf? tmp)
+              (<span style="color: #a020f0;">let</span> ([value (leaf-value tmp)])
+                e1 ... e2)]]
+          [_
+           (syntax-violation 'tree-case <span style="color: #8b2252;">"invalid clause syntax"</span> stx cl)])))
+    (<span style="color: #a020f0;">syntax-case</span> stx ()
+      [(_ tree-expr clause ...)
+       (with-syntax ([(clause ...)
+                      (<span style="color: #a020f0;">map</span> parse-clause #'(clause ...))])
+         #'(<span style="color: #a020f0;">let</span> ([tmp tree-expr])
+             (<span style="color: #a020f0;">unless</span> (tree? tmp)
+               (assertion-violation 'tree-case <span style="color: #8b2252;">"invalid tree argument"</span> tmp))
+             (<span style="color: #a020f0;">cond</span>
+              clause ...
+              [<span style="color: #a020f0;">else</span>
+               (assertion-violation 'tree-case <span style="color: #8b2252;">"unhandled tree argument"</span> tmp)])))]
+      [_
+       (syntax-violation 'tree-case <span style="color: #8b2252;">"invalid syntax"</span> stx)])))
+
+(<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">tree?</span>
+  (<span style="color: #a020f0;">lambda</span> (obj)
+    (<span style="color: #a020f0;">or</span> (node? obj)
+        (leaf? obj))))
+</pre>
+</div>
+
+<p>
+In the above macro, we used the procedure <code>syntax-violation</code> defined
+by Scheme to report syntax errors when the macro is misused.  It is
+always a good idea to report syntax violations as early and as precise
+as possible.
+</p>
+
+<p>
+The two identifiers, the Scheme reports speak of <i>auxiliary syntax</i>,
+<code>node</code> and <code>leaf</code> are matched using <code>free-identifier=?</code>.  Both of
+these identifiers are bound (they were bound by our record-type
+definitions of the <code>node</code> and the <code>leaf</code> type).  Thus, when the macro is used in the form
+</p>
+<div class="org-src-container">
+<pre class="src src-:scheme">(tree-case t
+ [(n l v r) ---]
+ ---)
+</pre>
+</div>
+<p>
+the binding of the identifier <code>n</code> is compared to the binding of the
+identifier <code>node</code> (in the lexical context of the macro transformer).
+</p>
+
+<p>
+In general, it is a good idea to use bound identifiers as literals in
+<code>syntax-case</code> (or <code>syntax-rules</code>).  Even if the code surrounding a
+macro use of, say, <code>tree-case</code> binds <code>node</code> to something else, the
+library system of Scheme allows to import another identifier that is
+bound to the original binding of <code>node</code> so the <code>tree-case</code> macro can
+still be used with the other identifier in place.  This does not work
+when <code>free-identifier=?</code> compares unbound identifiers by name.
+</p>
+
+<p>
+With our <code>tree-case</code> macro, we can finally define and test our newly
+written <code>tree-accumulate</code>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">tree-accumulate</span>
+  (<span style="color: #a020f0;">lambda</span> (t)
+    (tree-case t
+     [(node left value right)
+      (+ (tree-accumulate left)
+         value
+         (tree-accumulate right))]
+     [(leaf value)
+      value])))
+
+(tree-accumulate t)
+</pre>
+</div>
+
+<pre class="example" id="org4f7c82e">
+14
+</pre>
+
+<p>
+We have solved our binary-tree-use case but we can still do better.
+Assume that the problem we have to solve the next day does not involve
+binary trees but abstract syntax trees of a programming language, for
+which we have to write an interpreter or compiler.  Instead of
+(internal) nodes and leaves, we would have, say, expressions,
+statements, definitions, programs.  When walking an abstract syntax
+tree, one has to dispatch again on the possible types of an abstract
+syntax tree.  So, instead of <code>tree-case</code> we want <code>ast-case</code>.  We could
+copy and suitably modify the <code>tree-case</code> macro but this would violate
+DRY.
+</p>
+
+<p>
+The answer is, instead, to write a macro, once and for all, that
+generates macros like <code>tree-case</code>.  Here it is:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">define-destructor</span>
+  (<span style="color: #a020f0;">lambda</span> (stx)
+    (<span style="color: #a020f0;">syntax-case</span> stx ()
+      [(_ name [keyword predicate-expr accessor-expr ...] ...)
+       (for-all identifier? #'(keyword ...))
+       (with-syntax
+           ([(pred-id ...)
+             (generate-temporaries #'(predicate-expr ...))]
+            [((acc-id ...) ...)
+             (<span style="color: #a020f0;">map</span> generate-temporaries #'((accessor-expr ...) ...))]
+            [((var ...) ...)
+             (<span style="color: #a020f0;">map</span> generate-temporaries #'((accessor-expr ...) ...))])
+         #'(<span style="color: #a020f0;">begin</span>
+             (<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">pred-id</span> predicate-expr) ...
+             (<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">acc-id</span> accessor-expr) ... ...
+             (<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">name</span>
+               (<span style="color: #a020f0;">lambda</span> (stx)
+                 (<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">parse-clause</span>
+                   (<span style="color: #a020f0;">lambda</span> (cl)
+                     (<span style="color: #a020f0;">syntax-case</span> cl (keyword ...)
+                       [[(keyword var ...) e1 (... ...) e2]
+                        #'[(pred-id tmp)
+                           (<span style="color: #a020f0;">let</span> ([var (acc-id tmp)] ...)
+                             e1 (... ...) e2)]]
+                       ...
+                       [_
+                        (syntax-violation 'name <span style="color: #8b2252;">"invalid clause syntax"</span> stx cl)])))
+                 (<span style="color: #a020f0;">syntax-case</span> stx ()
+                   [(_ expr clause (... ...))
+                    (with-syntax ([(clause (... ...))
+                                   (<span style="color: #a020f0;">map</span> parse-clause #'(clause (... ...)))])
+                      #'(<span style="color: #a020f0;">let</span> ([tmp expr])
+                          (<span style="color: #a020f0;">cond</span>
+                           clause (... ...)
+                           [<span style="color: #a020f0;">else</span>
+                            (assertion-violation 'name <span style="color: #8b2252;">"unhandled argument"</span> tmp)])))]
+                   [_
+                    (syntax-violation 'name <span style="color: #8b2252;">"invalid syntax"</span> stx)])))))]
+      [_
+       (syntax-violation 'define-destructor <span style="color: #8b2252;">"invalid syntax"</span> stx)])))
+</pre>
+</div>
+
+<p>
+A few explanations are in order.  First of all, we see nested ellipses
+in the code above.  Using <code>syntax-case</code> we can match a syntax object
+of the form <code>((a b c) (1 2))</code> against a pattern of the form <code>((x ...)
+...)</code>.  The pattern variable <code>x</code> will then represent a list of two
+lists; the first list will contain the elements <code>a</code>, <code>b</code>, and <code>c</code>, the
+second list will contain the elements <code>1</code> and <code>2</code>.  In <code>syntax</code>
+templates, the pattern variable can be used as long as least two
+ellipses follow.  For example, the template <code>((x ...) ...)</code> gives back
+<code>((a b c) (1 2))</code>, while <code>(x ... ...)</code> gives <code>(a b c 1 2)</code>.
+</p>
+
+<p>
+We also have to explain the occurrences of <code>(... ...)</code>.  In the
+definition of <code>define-destructor</code>, the outer syntax form has to
+evaluate into a syntax object that contains ellipses, so we have to
+keep the outer syntax form from interpreting these ellipses that
+should be in the output syntax object, in other words, we have to
+escape them.  The Scheme way of doing this, is to write <code>(... x)</code>.  If
+<code>syntax</code> sees a sub-template like this one, it processes <code>x</code> and
+returns the result but gives the ellipsis in <code>x</code> the status of an
+ordinary identifier.
+</p>
+
+<p>
+Coming back to our tree example, the <code>define-destructor</code> syntax can be
+used as follows:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(define-destructor tree-case
+  [node node? node-left node-value node-right]
+  [leaf leaf? leaf-value])
+</pre>
+</div>
+
+<p>
+Now we can redefine <code>tree-accumulate</code> and test it:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">tree-accumulate</span>
+  (<span style="color: #a020f0;">lambda</span> (t)
+    (tree-case t
+     [(node left value right)
+      (+ (tree-accumulate left)
+         value
+         (tree-accumulate right))]
+     [(leaf value)
+      value])))
+
+(tree-accumulate t)
+</pre>
+</div>
+
+<pre class="example" id="org99aaffe">
+14
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org1956bb1" class="outline-2">
+<h2 id="org1956bb1"><span class="section-number-2">7.</span> Breaking hygiene</h2>
+<div class="outline-text-2" id="text-7">
+<p>
+Scheme macros written with <code>syntax-rules</code> are hygienic.  This is also
+true by default for macros written with the more general
+<code>syntax-case~/~syntax</code> combination.  Hygiene &#x2014; although it may take
+some time to understand &#x2014; is one of the selling points of Scheme
+macros and one (of many) reasons why Scheme macros are so more
+powerful than, say, macros in C or even in Common Lisp.
+</p>
+
+<p>
+Sometimes, however, we want to break hygiene explicitely.  We give a
+number of concrete examples:
+</p>
+</div>
+
+<div id="outline-container-org5b97738" class="outline-3">
+<h3 id="org5b97738"><span class="section-number-3">7.1.</span> A classical loop macro</h3>
+<div class="outline-text-3" id="text-7-1">
+<p>
+A classical example for this is a <code>loop</code> macro that provides a loop
+that evaluates the code enclosed in it repeatedly until a
+corresponding <code>break</code> command is evaluated.  A typical use looks like
+the following (again, not necessarily a good example for functional
+programming!):
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">let</span> ([i 0])
+  (loop
+    (<span style="color: #a020f0;">when</span> (= i 5)
+      (break))
+    (display i)
+    (newline)
+    (incr! i)))
+</pre>
+</div>
+
+<p>
+Our first attempt to implement the <code>loop</code> construct with a macro is
+the following syntax definition:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">loop</span>
+  (<span style="color: #a020f0;">lambda</span> (stx)
+    (<span style="color: #a020f0;">syntax-case</span> stx ()
+      [(_ e ...)
+       #'(<span style="color: #a020f0;">call-with-current-continuation</span>
+          (<span style="color: #a020f0;">lambda</span> (break)
+            (<span style="color: #a020f0;">let</span> <span style="color: #0000ff;">f</span> ()
+              e ...
+              (f))))])))
+</pre>
+</div>
+
+<p>
+Here we make use of the fact that Scheme has first-class
+continuations.  The call to <code>call-with-current-continuation</code> captures
+the continuation of the named <code>let</code> expression.
+</p>
+
+<p>
+Nevertheless, our example code that is supposed to print the numbers
+zero to four won't work with this version of the <code>loop</code> keyword.  Our
+Scheme system will tell us that <code>break</code> is an undefined identifier (or
+refer to a predefined top-level identifier with this name).  Although,
+it won't say that, but hygiene is to be blamed for it.
+</p>
+
+<p>
+As the identifier <code>break</code> bound in the output of <code>loop</code> does not
+come from the input of the <code>loop</code> form, it has a different history
+than the identifier <code>break</code> appearing in the body of the loop form.
+Identifiers with different histories do not shadow each other, so the
+<code>break</code> in the loop body cannot reference the binding of <code>break</code>
+coming from the template in the <code>loop</code> macro.
+</p>
+
+<p>
+One way to solve it is to provide <code>break</code> as an explicit argument to
+the loop macro (we put a star to the name to mark the new syntax):
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">loop*</span>
+  (<span style="color: #a020f0;">lambda</span> (stx)
+    (<span style="color: #a020f0;">syntax-case</span> stx ()
+      [(_ break e ...)
+       #'(<span style="color: #a020f0;">call-with-current-continuation</span>
+          (<span style="color: #a020f0;">lambda</span> (break)
+            (<span style="color: #a020f0;">let</span> <span style="color: #0000ff;">f</span> ()
+              e ...
+              (f))))])))
+</pre>
+</div>
+
+<p>
+With this modification, everything works:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">let</span> ([i 0])
+  (loop* break
+    (<span style="color: #a020f0;">when</span> (= i 5)
+      (break))
+    (display i)
+    (newline)
+    (incr! i)))
+</pre>
+</div>
+
+<p>
+This solution has one more advantage besides that it actually works
+&#x2014; it allows us to specify the name we want to use for the expression
+breaking out of the loop.  For example, it allows us to easily nest two of
+the loops:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">let</span> ([i 0])
+  (loop* break-outer
+    (loop* break-inner
+      (<span style="color: #a020f0;">when</span> (= i 5)
+        (break-outer))
+      (<span style="color: #a020f0;">when</span> (= i 2)
+        (break-inner))
+      (display i)
+      (newline)
+      (incr! i))
+    (display <span style="color: #8b2252;">"-\n"</span>)
+    (incr! i)))
+</pre>
+</div>
+
+<p>
+(Note how hygiene again helps to make this possible.  Both macro
+instances bind the identifier <code>f</code>, but the occurrences of <code>f</code>
+correspond to different histories so they don't shadow each other.)
+</p>
+
+<p>
+While the version with an explicit <code>break</code> argument to the <code>loop*</code>
+macro has its advantages, sometimes we still may want the more terse
+syntax with an implicit <code>break</code> parameter.  To make our original
+version of <code>loop</code> work, we must not introduce a <code>break</code> identifier
+with a different history.  Instead, we must output <code>break</code> as if it
+appeared as an argument to the macro use.  In other words, we have to
+forge an identifier and <code>datum-&gt;syntax</code> was the tool to do this:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">loop</span>
+  (<span style="color: #a020f0;">lambda</span> (stx)
+    (<span style="color: #a020f0;">syntax-case</span> stx ()
+      [(k e ...)
+       (with-syntax ([break (datum-&gt;syntax #'k 'break)])
+         #'(<span style="color: #a020f0;">call-with-current-continuation</span>
+            (<span style="color: #a020f0;">lambda</span> (break)
+              (<span style="color: #a020f0;">let</span> <span style="color: #0000ff;">f</span> ()
+                e ...
+                (f)))))])))
+</pre>
+</div>
+
+<p>
+Here, for the first time, we make use of the keyword identifier of the
+macro use, which we bound to the pattern variable <code>k</code>.  The call to
+<code>datum-&gt;syntax</code> then returns an identifier named <code>break</code> as if it
+appears where the macro use keyword appears, that is with the same
+history and the same lexical context.
+</p>
+
+<p>
+Let us test our example with this new version!
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">let</span> ([i 0])
+  (loop
+    (<span style="color: #a020f0;">when</span> (= i 5)
+      (break))
+    (display i)
+    (newline)
+    (incr! i)))
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgb8878a8" class="outline-3">
+<h3 id="orgb8878a8"><span class="section-number-3">7.2.</span> Convenience syntax to bind implicit identifiers</h3>
+<div class="outline-text-3" id="text-7-2">
+<p>
+Above, we used the <code>datum-&gt;syntax</code> procedure together with
+<code>with-syntax</code> explicitly to inject an identifier as if it appeared at
+the macro use site into the template.  Chez Scheme provides a
+syntactic form <code>with-implicit</code> that abstracts from this low-level
+approach.  While the <code>with-implicit</code> form is non-standard, thanks to
+Scheme's macro system we can define it in any standard system:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">with-implicit</span>
+  (<span style="color: #a020f0;">lambda</span> (x)
+    (<span style="color: #a020f0;">syntax-case</span> x ()
+      [(_ (k x ...) e1 ... e2)
+       (for-all identifier? #'(k x ...))
+       #'(with-syntax ([x (datum-&gt;syntax #'k 'x)] ...)
+           e1 ... e2)]
+      [_
+       (syntax-violation 'with-implicit <span style="color: #8b2252;">"invalid syntax"</span> x)])))
+</pre>
+</div>
+
+<p>
+With it, we can rewrite our <code>loop</code> macro as follows:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">loop</span>
+  (<span style="color: #a020f0;">lambda</span> (stx)
+    (<span style="color: #a020f0;">syntax-case</span> stx ()
+      [(k e ...)
+       (<span style="color: #a020f0;">with-implicit</span> (k break)
+         #'(<span style="color: #a020f0;">call-with-current-continuation</span>
+            (<span style="color: #a020f0;">lambda</span> (break)
+              (<span style="color: #a020f0;">let</span> <span style="color: #0000ff;">f</span> ()
+                e ...
+                (f)))))])))
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org99195e7" class="outline-3">
+<h3 id="org99195e7"><span class="section-number-3">7.3.</span> Definitions that make the bound name accessible</h3>
+<div class="outline-text-3" id="text-7-3">
+<p>
+For those who didn't like the <code>loop</code> example because it is mostly
+useful in imperative programming, we have provided another example,
+that we will describe in this subsection.
+</p>
+
+<p>
+User-friendly procedures check their arguments so that errors are
+reported early:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">reverse-append</span>
+  (<span style="color: #a020f0;">lambda</span> (head tail)
+    (<span style="color: #a020f0;">unless</span> (list? head)
+      (assertion-violation 'reverse-append <span style="color: #8b2252;">"invalid list argument"</span> head))
+    (<span style="color: #a020f0;">let</span> <span style="color: #0000ff;">f</span> ([head head] [tail tail])
+      (<span style="color: #a020f0;">cond</span>
+       [(null? head) tail]
+       [(pair? head)
+        (f (cdr head) (cons (car head) tail))]
+       [<span style="color: #a020f0;">else</span>
+        (assertion-violation 'reverse-append <span style="color: #8b2252;">"concurrent modification detected"</span>)]))))
+</pre>
+</div>
+
+<p>
+Just a brief test:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(reverse-append '(1 2 3) '(4 5 6))
+</pre>
+</div>
+
+<pre class="example" id="org1a35b53">
+(3 2 1 4 5 6)
+</pre>
+
+<p>
+The Scheme procedure that is used here to report an error is
+<code>assertion-violation</code>.  Its first formal argument is called <code>who</code> and
+(if not <code>#f</code>) should be a string or symbol naming the procedure where
+the error occurs.
+</p>
+
+<p>
+One can make the point that the code above again violates some
+instance of the DRY principle because we had to type the name of the
+procedure, <code>reverse-append</code> in this case, three times.  The following,
+non-hygienic, macro, which can also be found in the source code of
+Chez Scheme and in one of Racket's libraries, helps:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">define/who</span>
+  (<span style="color: #a020f0;">lambda</span> (x)
+    (<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">out</span>
+      (<span style="color: #a020f0;">lambda</span> (k f e)
+        (with-syntax ([k k] [f f] [e e])
+          (<span style="color: #a020f0;">with-implicit</span> (k who)
+            #'(<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">f</span>
+                (<span style="color: #a020f0;">let</span> ((who 'f)) e))))))
+    (<span style="color: #a020f0;">syntax-case</span> x ()
+      [(k (f . u) e1 ... e2)
+       (identifier? #'f)
+       (out #'k #'f #'(<span style="color: #a020f0;">lambda</span> u e1 ... e2))]
+      [(k f e)
+       (identifier? #'f)
+       (out #'k #'f #'e)]
+      [_
+       (syntax-violation 'define/who <span style="color: #8b2252;">"invalid syntax"</span> x)])))
+</pre>
+</div>
+
+<p>
+With <code>define/who</code> we can define a variable (or procedure) as with
+<code>define</code>.  Moreover, the identifier <code>who</code> (with a lexical and historic
+context as the keyword <code>define/who</code> in the macro use) is bound to the
+name of the variable (or procedure) being defined.
+</p>
+
+<p>
+With <code>define/who</code>, the definition of <code>reverse-append</code> looks like:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(define/who reverse-append
+  (<span style="color: #a020f0;">lambda</span> (head tail)
+    (<span style="color: #a020f0;">unless</span> (list? head)
+      (assertion-violation 'who <span style="color: #8b2252;">"invalid list argument"</span> head))
+    (<span style="color: #a020f0;">let</span> <span style="color: #0000ff;">f</span> ([head head] [tail tail])
+      (<span style="color: #a020f0;">cond</span>
+       [(null? head) tail]
+       [(pair? head)
+        (f (cdr head) (cons (car head) tail))]
+       [<span style="color: #a020f0;">else</span>
+        (assertion-violation 'who <span style="color: #8b2252;">"concurrent modification detected"</span>)]))))
+</pre>
+</div>
+
+<p>
+We can compare <code>who</code> with the predefined identifier <code>__func__</code> that
+can be found in the C99 standard.  With Scheme and its macro system,
+however, this becomes a library feature and need not be a language
+feature.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgab1a16c" class="outline-3">
+<h3 id="orgab1a16c"><span class="section-number-3">7.4.</span> Definitions of constants</h3>
+<div class="outline-text-3" id="text-7-4">
+<p>
+In Scheme, we can use <code>define</code> to, well, define a variable.  This
+variable can be <code>set!</code> by other parts of the code, possibly
+accidentally.  So we may want to define a variable-like object that
+behaves more like a constant.  One option is to use the
+<code>identifier-syntax</code> form, we already saw at the beginning of the
+tutorial:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">pi</span> (identifier-syntax 3.14159))
+pi
+</pre>
+</div>
+
+<pre class="example" id="org74cd480">
+3.14159
+</pre>
+
+<p>
+If we tried to mutate the "variable" <code>pi</code> now, the Scheme system would
+raise an exception.
+</p>
+
+<p>
+This is a good point to give the actual definition of
+<code>identifier-syntax</code>.  Like <code>syntax-rules</code>, it can be defined by the
+more primitive forms <code>syntax-case</code> and <code>syntax</code>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">identifier-syntax</span>
+  (<span style="color: #a020f0;">syntax-rules</span> (<span style="color: #a020f0;">set!</span>)
+    [(_ e)
+     (<span style="color: #a020f0;">lambda</span> (x)
+       (<span style="color: #a020f0;">syntax-case</span> x ()
+         [id (identifier? #&#8217;id) #&#8217;e]
+         [(_ x (... ...)) #&#8217;(e x (... ...))]))]
+    [(_ (id exp1) ((<span style="color: #a020f0;">set!</span> var val) exp2))
+     (<span style="color: #a020f0;">and</span> (identifier? #&#8217;id) (identifier? #&#8217;var))
+     (make-variable-transformer
+      (<span style="color: #a020f0;">lambda</span> (x)
+        (<span style="color: #a020f0;">syntax-case</span> x (<span style="color: #a020f0;">set!</span>)
+          [(<span style="color: #a020f0;">set!</span> var val) #&#8217;exp2]
+          [(id x (... ...)) #&#8217;(exp1 x (... ...))]
+          [id (identifier? #&#8217;id) #&#8217;exp1])))]))
+</pre>
+</div>
+
+<p>
+This definition can be found exactly in this form in the R6RS,
+describing the Scheme language and its standard libraries.  Again, we
+see the occurrence of the quoted ellipses <code>(... ...)</code>, which is
+necessary because of the nesting of templates (remember that the right
+hand side of <code>syntax-rules</code> rules are <code>syntax</code> templates).
+</p>
+
+<p>
+We also note the two patterns within the first <code>syntax-case</code>.  The
+first pattern is of the form <code>id</code> where <code>id</code> is an identifier, the
+second pattern is of the form <code>(_ x ...)</code> where <code>x</code> is an arbitrary
+form.  The first pattern will match if the identifier, <code>pi</code> in our
+example, is not used in head-position of a combination; the second
+pattern will match if <code>pi</code> is used in the form <code>(pi x ...)</code>.  The
+latter does not make sense for <code>pi</code>, but we see that
+<code>identifier-syntax</code> allows us to define procedure-like identifiers
+that behave differently when the directly applied or when referenced.
+</p>
+
+<p>
+In the second part of the definition of <code>identifier-syntax</code>, the
+procedure <code>make-variable-transformer</code> is used.  This turns a macro
+transformer given by a procedure (mapping syntax objects to syntax
+objects) into a <i>variable-transformer</i>.  A variable-transformer does
+the same mapping between syntax objects but will also be called by the
+expander when it processes an expression of the form <code>(set! id form)</code>
+where <code>id</code> is the keyword bound to a variable-transformer.
+</p>
+
+<p>
+Now, 3.14159 is not the most precise value of <code>pi</code>.  We get a value
+whose precision is adapted to the precision of Schemes inexact real
+numbers by using the formula <code>(* 2 (atan 1 0))</code>.  This directly leads to the
+following attempt of redefining <code>pi</code>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">pi</span> (identifier-syntax (* 2 (atan 1 0))))
+pi
+</pre>
+</div>
+
+<pre class="example" id="orgf18b9f2">
+3.141592653589793
+</pre>
+
+<p>
+This is not a good solution, though.  Every time, we reference <code>pi</code>,
+Scheme replaces it by the expression <code>(* 2 (atan 1 0))</code>, so unless we
+can rely on a sufficiently optimizing compiler, we will have <code>pi</code>
+recalculated every time we use it.  A better approach is to calculate
+the value once, store this is a variable and expand into a reference
+to it:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">define-constant</span>
+  (<span style="color: #a020f0;">lambda</span> (stx)
+    (<span style="color: #a020f0;">syntax-case</span> stx ()
+      [(_ id expr)
+       (identifier? #'id)
+       #'(<span style="color: #a020f0;">begin</span>
+           (<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">val</span> expr)
+           (<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">id</span> (identifier-syntax val)))])))
+</pre>
+</div>
+
+<p>
+Again, we have macro-defining macro.  Thanks to hygiene, the variable
+<code>val</code> cannot be accessed outside the macro.  Let's test our new macro:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(define-constant pi (* 2 (atan 1 0)))
+pi
+</pre>
+</div>
+
+<pre class="example" id="org09f1955">
+3.141592653589793
+</pre>
+
+<p>
+The number <code>pi</code> is just a single constant, so let us now turn to a use
+case where not only more than one constant but many constants are
+needed.  For concreteness, let us assume that want to develop a
+library handling ELF files.  We could start with defining all the
+magic constants:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(define-constant et-none #x00)
+(define-constant et-rel  #x01)
+(define-constant et-exec #x02)
+...
+(define-constant pt-null #x00000000)
+(define-constant pt-load #x00000001)
+...
+</pre>
+</div>
+
+<p>
+This is not much different from what we would do in C.  However, it
+has the same problem.  It pollutes our top-level namespace.  In
+Scheme, this is mitigated a bit due to the library system (which
+allows one to confine these constants in a module); nevertheless a
+library that exports myriads of identifiers (and where the exact set
+of identifiers may depend on the version of the ELF format) is not a
+good idea.
+</p>
+
+<p>
+A way out is &#x2014; you will already have guessed it &#x2014; the Scheme macro
+system.  We will implement a macro <code>define-constants</code> that can be used
+as follows:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(define-constants elf-constant
+  (et-none #x00)
+  (et-rel  #x01)
+  ...)
+
+(elf-constant et-none) <span style="color: #b22222;">; </span><span style="color: #b22222;">=&gt; 0x01</span>
+</pre>
+</div>
+
+<p>
+Moreover, we want this definition to bind the identifier
+<code>elf-constants</code> (note the "s") to a procedure returning an association
+list of the form
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">((et-none . #x00)
+ (et-rel  . #x01)
+ ...)
+</pre>
+</div>
+
+<p>
+For this, we first need a procedure that takes an identifier like
+<code>elf-constant</code> and constructs a new identifier, <code>elf-constants</code> in
+this case, from it:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(define/who construct-name
+  (<span style="color: #a020f0;">lambda</span> (k . arg*)
+    (<span style="color: #a020f0;">unless</span> (identifier? k)
+      (assertion-violation who <span style="color: #8b2252;">"invalid template identifier argument"</span> k))
+    (datum-&gt;syntax
+     k
+     (string-&gt;symbol
+      (apply string-append
+             (<span style="color: #a020f0;">map</span> (<span style="color: #a020f0;">lambda</span> (x)
+                    (<span style="color: #a020f0;">cond</span>
+                     [(string? x)
+                      x]
+                     [(identifier? x)
+                      (symbol-&gt;string (syntax-&gt;datum x))]
+                     [<span style="color: #a020f0;">else</span>
+                      (assertion-violation who <span style="color: #8b2252;">"invalid string or identifier argument"</span> x)]))
+                  arg*))))))
+</pre>
+</div>
+
+<p>
+This procedure takes a template identifier <code>k</code> and a sequence of
+strings and identifiers to forge and return an identifier with the
+same lexical and historic context as <code>k</code> and whose name is given by
+the concatenation of the sequence of strings and identifier (names).
+</p>
+
+<p>
+With it, we can define our <code>define-constants</code> easily:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">define-constants</span>
+  (<span style="color: #a020f0;">lambda</span> (x)
+    (<span style="color: #a020f0;">syntax-case</span> x ()
+      [(_ t (n c) ...)
+       (<span style="color: #a020f0;">and</span> (identifier? #'t)
+            (for-all identifier? #'(n ...)))
+       (with-syntax ([ts (construct-name #'t #'t <span style="color: #8b2252;">"s"</span>)]
+                     [(e ...) (generate-temporaries #'(c ...))])
+         #'(<span style="color: #a020f0;">begin</span>
+             (<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">e</span> c)
+             ...
+             (<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">t</span>
+               (<span style="color: #a020f0;">lambda</span> (x)
+                 (<span style="color: #a020f0;">syntax-case</span> x ()
+                   [(_ y)
+                    (identifier? #'y)
+                    (<span style="color: #a020f0;">cond</span>
+                     [(assq (syntax-&gt;datum #'y) (list (cons 'n #'e) ...)) =&gt; cdr]
+                     [<span style="color: #a020f0;">else</span>
+                      (syntax-violation 't <span style="color: #8b2252;">"unknown constant"</span> x #'y)])]
+                   [_
+                    (syntax-violation 't <span style="color: #8b2252;">"invalid syntax"</span> x)])))
+             (<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">ts</span>
+               (<span style="color: #a020f0;">lambda</span> ()
+                 '([n . c] ...)))))])))
+</pre>
+</div>
+
+<p>
+The macro is programmed so that the lookup of the constant happens at
+expand-time and not at run-time.  Let us test it:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(define-constants color
+  (salmon          #xFA8072)
+  (light-green     #x90EE90)
+  (cornflower-blue #x6495ED))
+
+(colors)
+</pre>
+</div>
+
+<pre class="example" id="org841a750">
+((salmon . 16416882) (light-green . 9498256) (cornflower-blue . 6591981))
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(color cornflower-blue)
+</pre>
+</div>
+
+<pre class="example" id="orgc059743">
+6591981
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orgc1614b1" class="outline-3">
+<h3 id="orgc1614b1"><span class="section-number-3">7.5.</span> A pitfall</h3>
+<div class="outline-text-3" id="text-7-5">
+<p>
+Although the macros <code>loop</code> and <code>define/who</code> defined above are
+non-hygienic, they are only so in a controlled sense.  They behave as
+if the user has provided an explicit <code>break</code> or <code>who</code> identifier, so
+do not really differ from a hygienic macro, which makes reasoning
+about them still easy.
+</p>
+
+<p>
+Nevertheless, there is still a potential pitfall, we are going to
+explain now.  Consider the following definition of the macro
+<code>define-logging/who</code>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">define-logging/who</span>
+  (<span style="color: #a020f0;">syntax-rules</span> ()
+    [(define-logging/who (name . formals) body1 ... body2)
+     (define/who (name . formals)
+       (display <span style="color: #8b2252;">"log: entering procedure "</span>)
+       (display who)
+       (newline)
+       body1 ... body2)]))
+</pre>
+</div>
+
+<p>
+The macro defines a "logging procedure", a procedure that prints a log
+message when it is called:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(define-logging/who (hello)
+  (display <span style="color: #8b2252;">"Hello!\n"</span>))
+(hello)
+</pre>
+</div>
+
+<pre class="example" id="orgf445b6e">
+log: entering procedure hello
+Hello!
+</pre>
+
+<p>
+The <code>define-logging/who</code> macro's output is an instance of the
+<code>define/who</code> macro from earlier.  The <code>define-logging/who</code> macro makes
+use of the implicitly defined <code>who</code> identifier.
+</p>
+
+<p>
+We named the macro <code>define-logging/who</code> with the suffix <code>/who</code> because
+the idea is that the user of the <code>define-logging/who</code> macro can also
+refer to the procedure's name through the implicitly bound identifier
+<code>who</code>.  This, however, is not the case as the following test shows:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">let</span> ([who 'outer])
+  (define-logging/who (return-who)
+    who)
+  (return-who))
+</pre>
+</div>
+
+<pre class="example" id="org04c717a">
+outer
+</pre>
+
+<p>
+The reason is that historic context of the identifier <code>who</code> is the
+same as the historic context of the identifier <code>define/who</code> that
+occurs in the syntax template in the definition of
+<code>define-logging/who</code>.  The historic context of the identifier
+<code>define/who</code>, which does not come from the macro input in the use of
+<code>define-logging/who</code>, is therefore not the same as those of the
+identifiers <code>who</code> appearing in the source of our test.
+</p>
+
+<p>
+This problem cannot be easily mitigated bar explicitly define <code>who</code> a
+second time with the historic context of the final macro use.  One
+could think a possible solution would be the following rewrite:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">define-logging/who</span>
+  (<span style="color: #a020f0;">lambda</span> (stx)
+    (<span style="color: #a020f0;">syntax-case</span> stx ()
+      [(k (name . formals) body1 ... body2)
+       (<span style="color: #a020f0;">with-implicit</span> (k define/who who)
+         #'(define/who (name . formals)
+             (display <span style="color: #8b2252;">"log: entering procedure "</span>)
+             (display who)
+             (newline)
+             body1 ... body2))])))
+</pre>
+</div>
+
+<p>
+Here, the identifier <code>define/who</code> is put in the macro output of
+<code>define-logging/who</code> with the same history as the keyword in the macro
+use of <code>define-logging/who</code>.  This will create <code>who</code> with the historic
+context of the macro use of <code>define-logging/who</code> (and that's why we
+had to add <code>who</code> to the list of implicit identifiers as well), but it
+will only work if <code>define/who</code> is also bound (to the correct macro) at
+the use site of the macro <code>define-logging/who</code>.  Such an assumption,
+however, should not be made.  (In the section after next we are going
+to finally give a solution that works, but it needs an extension which
+is not in R6RS.)
+</p>
+
+<p>
+Our other example for a macro with implicit (unhygienic) identifiers
+was <code>define-constant</code> where the plural form of the name of the defined
+macro was a forged identifier.  That identifier's history, however,
+was not derived from the macro keyword in the macro use but from the
+(singular) name of the defined macro.  This also helps mitigating the
+problem of nested macro invocations described above.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgc9fe97b" class="outline-2">
+<h2 id="orgc9fe97b"><span class="section-number-2">8.</span> Phasing</h2>
+<div class="outline-text-2" id="text-8">
+<p>
+Phasing is an issue that is not specific to the particular macro
+system of Scheme or hygienic macros but occurs with procedural macros
+when the system distinguishes between run-time and expand-time.  The
+latter distinction is important, for example, for the possibility of
+ahead-of-time compilation.  As Scheme allows to evaluate code at run
+time, which then has to be expanded first, run-time and expand-time
+can be interleaved.  The latter can also be due to the library system
+of Scheme; a library may need to be run first before another library
+can be expanded because the macro transformers may reference the code
+of the first library.
+</p>
+</div>
+
+<div id="outline-container-orgc6cee21" class="outline-3">
+<h3 id="orgc6cee21"><span class="section-number-3">8.1.</span> (Relative) phases</h3>
+<div class="outline-text-3" id="text-8-1">
+<p>
+When the expressions in a program or library are evaluated, the
+evaluation happens at a specific <i>relative phase</i>.  These relative
+phases are non-negative integers.  The top-level expressions are
+evaluated at relative phase 0.  The right-hand sides of top-level
+variable definitions are also evaluated at relative phase 0.  The
+right-hand sides of top-level syntax definitions are evaluated at
+relative phase 1 (which means: "earlier").  The right-hand side of a
+variable definition appearing within an expression evaluated at
+relative phase <i>n</i> is also evaluated at relative phase <i>n</i>.  The
+right-hand side of a syntax definition appearing within an expression
+evaluated at relative phase <i>n</i> is evaluated at relative <i>n</i> + 1.
+</p>
+
+<p>
+In other words, <i>define-syntax</i> shifts the phase by one for its
+right-hand side.
+</p>
+
+<p>
+The following code should make this clearer:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">begin</span>
+  (<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">x</span> 4)
+  (<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">foo</span>
+    (<span style="color: #a020f0;">lambda</span> (stx)
+      (<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">bar</span>
+        (<span style="color: #a020f0;">lambda</span> (stx)
+          #'3))
+      (+ 1 bar)))
+  (+ x foo))
+</pre>
+</div>
+
+<p>
+Assume that this expression is evaluated at phase <i>n</i> (0 if appearing
+at the program top-level).  The right-hand side of the definition of
+<code>x</code>, the reference to <code>x</code> and the use of the macro <code>foo</code> are evaluated
+at relative phase <i>n</i>.  The transformer expression of <code>foo</code> is
+evaluated at relative phases <i>n</i> + 1, and the transformer expression
+of <code>bar</code> is evaluated at relative phase <i>n</i> + 2.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orge16ff1a" class="outline-3">
+<h3 id="orge16ff1a"><span class="section-number-3">8.2.</span> Identifier references at different phases</h3>
+<div class="outline-text-3" id="text-8-2">
+<p>
+A variable (an identifier bound to a location holding a value) can be
+referenced by an expression if the expression is evaluated at the same
+relative phase as the initializing expression of the variable.  A
+keyword (an identifier bound to a macro transformer) can be referenced
+by an expression if the expression is evaluated at the same or higher
+relative phase than the phase of the transformer expression of the
+keyword minus one.
+</p>
+
+<p>
+The following code is erroneous, for example:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">let</span> ([counter 0])
+  (<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">count!</span>
+    (<span style="color: #a020f0;">lambda</span> (stx)
+      (<span style="color: #a020f0;">syntax-case</span> stx ()
+        [(_)
+         (<span style="color: #a020f0;">begin</span>
+           (<span style="color: #a020f0;">set!</span> counter (+ 1 counter))
+           #'(values))])))
+  (count!)
+  counter)
+</pre>
+</div>
+
+<p>
+The variable <code>counter</code> can only be referenced at relative phase 0,
+thus not in the right-hand side of the syntax definition of <code>count!</code>,
+which is evaluated at relative phase 1.  One can understand this
+restriction as follows: The variable <code>counter</code> only exists at
+run-time, not at compile-time of the program, but the transformer
+associated to <code>count!</code> us used at compile-time.
+</p>
+
+<p>
+On the other hand, the following example is correct code:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">let-syntax</span> ([foo (<span style="color: #a020f0;">lambda</span> (stx) #'1)])
+  (<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">bar</span>
+    (<span style="color: #a020f0;">lambda</span> (stx)
+      (<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">quux</span>
+        (<span style="color: #a020f0;">lambda</span> (stx)
+          foo))
+      quux))
+  bar)
+</pre>
+</div>
+
+<p>
+If a procedure needs to be used in different phases, in Scheme the
+library system can be used.  If a library exports a variable (bound to
+the procedure) or any other identifier, the identifier can be imported
+at any relative phase.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org0f73892" class="outline-2">
+<h2 id="org0f73892"><span class="section-number-2">9.</span> Extensions</h2>
+<div class="outline-text-2" id="text-9">
+<p>
+In this section, we will describe three extensions to Scheme macro's
+system that are not yet standardized in one the reports.  All three
+extensions are supported by Chez Scheme, so we can experiment with
+them.
+</p>
+</div>
+
+<div id="outline-container-orga26005f" class="outline-3">
+<h3 id="orga26005f"><span class="section-number-3">9.1.</span> Aliases</h3>
+<div class="outline-text-3" id="text-9-1">
+<p>
+Given an identifier <code>x</code>, we may want to use it under a different name
+as well.  The first attempt of defining an alias for <code>x</code> may look
+like:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">let</span> ([x 'old])
+  (<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">y</span>
+    (identifier-syntax
+     [_ x]
+     [(<span style="color: #a020f0;">set!</span> _ e) (<span style="color: #a020f0;">set!</span> x e)]))
+  (<span style="color: #a020f0;">set!</span> y 'new)
+  x)
+</pre>
+</div>
+
+<pre class="example" id="org49f379a">
+new
+</pre>
+
+<p>
+This solution has no run-time overhead because <code>y</code> is a keyword and
+not a variable.  Whenever we access <code>y</code>, Scheme's expander rewrites it
+into an access of <code>x</code>.  In a lot of cases, this is all that we need.
+Still, <code>y</code> is not a true alias to <code>x</code>.  This is demonstrated by the
+following test:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">let</span> ([x 'old])
+  (<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">y</span>
+    (identifier-syntax
+     [_ x]
+     [(<span style="color: #a020f0;">set!</span> _ e) (<span style="color: #a020f0;">set!</span> x e)]))
+  (free-identifier=? #'x #'y))
+</pre>
+</div>
+
+<pre class="example" id="orgdd87ff2">
+#f
+</pre>
+
+<p>
+The reason that the result of the <code>free-identifier=?</code> test is <code>#f</code> is
+that <code>x</code> and <code>y</code> are bound differently.  The identifier <code>x</code> is bound
+to a location holding a value (<code>x</code> is a variable); the identifier <code>y</code>
+is bound to a macro transformer (<code>y</code> is a keyword).
+</p>
+
+<p>
+The <code>alias</code> form described in <a href="https://srfi.schemers.org/srfi-212/srfi-212.html">SRFI 212</a> allows to define true aliases.
+The syntax is <code>(alias y x)</code>, which can be used wherever definitions
+are allowed.  It arranges that <code>y</code> has the same binding as <code>x</code>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">let</span> ([x 'old])
+  (alias y x)
+  (<span style="color: #a020f0;">set!</span> y 'new)
+  (list (free-identifier=? #'x #'y) x))
+</pre>
+</div>
+
+<pre class="example" id="orgda40fe6">
+(#t new)
+</pre>
+
+<p>
+(The reason why <code>alias</code> is not called <code>define-alias</code> is that it does
+not define a new binding; it just gives an existing binding (the one
+of <code>x</code>) a new name (<code>y</code>).)
+</p>
+
+<p>
+With the <code>alias</code> form, there is also a general solution to the general
+problem of nested unhygienic macros that we exhibited with
+<code>define-logging/who</code>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">define-logging/who</span>
+  (<span style="color: #a020f0;">lambda</span> (stx)
+    (<span style="color: #a020f0;">syntax-case</span> stx ()
+      [(k (name . formals) body1 ... body2)
+       (with-syntax ([(tmp-id) (generate-temporaries #'(tmp))])
+         (with-syntax ([local-define/who
+                        (construct-name #'k #'tmp-id)])
+           (<span style="color: #a020f0;">with-implicit</span> (k who)
+             #'(<span style="color: #a020f0;">begin</span>
+                 (alias local-define/who define/who)
+                 (local-define/who (name . formals)
+                   (display <span style="color: #8b2252;">"log: entering procedure "</span>)
+                   (display who)
+                   (newline)
+                   body1 ... body2)))))])))
+</pre>
+</div>
+
+<p>
+Here, we generate a fresh identifier and construct from its name an
+identifier with the context of the keyword of the use of
+<code>define-logging/who</code>.  This identifier is then aliased to <code>define/who</code>
+but is used instead so that the transformer bound to <code>define/who</code> (and
+now also bound to <code>define-logging/who</code> forges the <code>who</code> identifier
+with the right context.
+</p>
+
+<p>
+Let us test our new version:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">let</span> ([who 'outer])
+  (define-logging/who (return-who)
+    who)
+  (return-who))
+</pre>
+</div>
+
+<pre class="example" id="orgd7f6176">
+return-who
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orga30b8c8" class="outline-3">
+<h3 id="orga30b8c8"><span class="section-number-3">9.2.</span> Syntax parameters</h3>
+<div class="outline-text-3" id="text-9-2">
+<p>
+Syntax parameters, which are like aliases also described in a SRFI,
+namely <a href="https://srfi.schemers.org/srfi-139/srfi-139.html">SRFI 139</a>, provide an alternative to unhygienic macros when
+implicit macro parameters are needed.<sup><a id="fnr.11" class="footref" href="#fn.11" role="doc-backlink">11</a></sup>
+</p>
+
+<p>
+In what follows, we use Chez
+Scheme's implementation so that we can readily test our examples.
+</p>
+
+<p>
+Chez Scheme defines the <code>fluid-let-syntax</code> form, whose syntax is
+equivalent to <code>let-syntax</code>, but which is to <code>let-syntax</code> as
+<code>fluid-let</code> is to <code>let</code>.  In other words, it rebinds a keyword for the
+dynamic extent of the expansion of the body of <code>fluid-let-syntax</code>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">let-syntax</span> ([x (identifier-syntax 'outer)])
+  (<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">y</span> (identifier-syntax x))
+  (list
+   (<span style="color: #a020f0;">fluid-let-syntax</span> ([x (identifier-syntax 'inner)])
+     y)
+   y))
+</pre>
+</div>
+
+<pre class="example" id="orgf31b3dc">
+(inner outer)
+</pre>
+
+<p>
+Compare this to <code>let-syntax</code>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">let-syntax</span> ([x (identifier-syntax 'outer)])
+  (<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">y</span> (identifier-syntax x))
+  (list
+   (<span style="color: #a020f0;">let-syntax</span> ([x (identifier-syntax 'inner)])
+     y)
+   y))
+</pre>
+</div>
+
+<pre class="example" id="orgc1cc96a">
+(outer outer)
+</pre>
+
+<p>
+With the use of syntax parameters (keywords that are rebound by
+<code>fluid-let-syntax</code>), we can give a definition of our <code>loop</code> macro as a
+hygienic macro:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">break</span>
+  (<span style="color: #a020f0;">lambda</span> (stx)
+    (syntax-violation 'break <span style="color: #8b2252;">"invalid use outside of loop form"</span> stx)))
+(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">loop</span>
+  (<span style="color: #a020f0;">syntax-rules</span> ()
+    [(loop e ...)
+     (<span style="color: #a020f0;">call/cc</span>
+      (<span style="color: #a020f0;">lambda</span> (k)
+        (<span style="color: #a020f0;">fluid-let-syntax</span>
+            ([break (<span style="color: #a020f0;">syntax-rules</span> () [(break) (k)])])
+          (<span style="color: #a020f0;">let</span> <span style="color: #0000ff;">f</span> ()
+            e ... (f)))))]))
+</pre>
+</div>
+
+<p>
+Let us test this new version:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">let</span> ([i 0])
+  (loop
+    (<span style="color: #a020f0;">when</span> (= i 5)
+      (break))
+    (display i)
+    (newline)
+    (incr! i)))
+</pre>
+</div>
+
+<pre class="example" id="org3a90c30">
+0
+1
+2
+3
+4
+</pre>
+
+<p>
+In this example, <code>datum-&gt;syntax</code> does not appear so the macro defined
+above is indeed hygienic.  The identifier <code>break</code> was not newly
+introduced by the macro use but already existed in the lexical context
+of the macro use.
+</p>
+
+<p>
+It should be noted that the new <code>loop</code> macro has a different semantics
+than the unhygienic <code>loop</code> macro from earlier.  In our original <code>loop</code>
+macro, the expression <code>(break)</code> ends the loop when <code>break</code> is
+"<code>bound-identifier=?</code>" to the implicit identifier forged by the first
+version of the <code>loop</code> macro.  In the version with syntax parameters,
+the expression <code>(break)</code> ends the loop when <code>break</code> is
+"<code>free-identifier=?</code>" to the global identifier named <code>break</code>.  Which
+semantics is the better one depends on the use case.  On the one hand
+side, hygienic macros are preferable to unhygienic ones.  On the other
+hand side, syntax parameters have the same problem associated to
+variables with dynamic scope: Their change of the behavior of code is
+not lexically confined.
+</p>
+
+<p>
+The <a href="https://cisco.github.io/ChezScheme/csug9.5/syntax.html#./syntax:h1">Chez Scheme User's Guide</a> contains a very interesting use of syntax
+parameters, which we want to reproduce here:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">define-integrable</span>
+  (<span style="color: #a020f0;">syntax-rules</span> (<span style="color: #a020f0;">lambda</span>)
+    [(_ name (<span style="color: #a020f0;">lambda</span> formals form1 form2 ...))
+     (<span style="color: #a020f0;">begin</span>
+       (<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">xname</span>
+         (<span style="color: #a020f0;">fluid-let-syntax</span> ([name (identifier-syntax xname)])
+           (<span style="color: #a020f0;">lambda</span> formals form1 form2 ...)))
+       (<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">name</span>
+         (<span style="color: #a020f0;">lambda</span> (x)
+           (<span style="color: #a020f0;">syntax-case</span> x ()
+             [_ (identifier? x) #'xname]
+             [(_ arg (... ...))
+              #'((<span style="color: #a020f0;">fluid-let-syntax</span> ([name (identifier-syntax xname)])
+                   (<span style="color: #a020f0;">lambda</span> formals form1 form2 ...))
+                  arg
+                  (... ...))]))))]))
+</pre>
+</div>
+
+<p>
+The <code>define-integrable</code> keyword can be used as follows:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(define-integrable count
+  (<span style="color: #a020f0;">lambda</span> (ls)
+    (<span style="color: #a020f0;">if</span> (null? ls)
+        0
+        (+ (car ls) (count (cdr ls))))))
+
+(list (count '(1 2 3))
+      (procedure? count))
+</pre>
+</div>
+
+<pre class="example" id="orge030491">
+(6 #t)
+</pre>
+
+<p>
+This definition binds <code>count</code> to a keyword that behaves like an
+immutable variable bound to a procedure.  However, when <code>count</code> is
+used in the form <code>(count '(1 2 3))</code> the procedures body is inlined at
+the macro use site, allowing for more local optimizations.  We chose
+the example of a recursive procedure because it demonstrates a
+difficulty: If <code>count</code> in the procedure's body were also inlined and
+so on, we would get an infinite macro expansion.  Instead, the
+implementation of <code>define-integrable</code> uses a syntax parameter to
+rebound <code>count</code> in the procedure body so that it is not further
+inlined.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgb768b1e" class="outline-3">
+<h3 id="orgb768b1e"><span class="section-number-3">9.3.</span> Identifier properties</h3>
+<div class="outline-text-3" id="text-9-3">
+<p>
+It is often the case that two different macros have to communicate.
+In its simplest form we already saw it, namely in the case of macros
+whose behavior depends on the presence of auxiliary syntax (another
+macro) in their inputs.  A typical example is Scheme's <code>cond</code> keyword
+(implementable as a macro in terms of <code>if</code>) that uses the <code>else</code>
+auxiliary syntax.
+</p>
+
+<p>
+Such an auxiliary keyword can function as a yes/no flag.  Sometimes,
+however, we may be interested in more than a boolean value.  This can
+be done with identifier properties, which are implemented in Chez
+Scheme and also described in <a href="https://srfi.schemers.org/srfi-213/srfi-213.html">SRFI 213</a>.
+</p>
+
+<p>
+An identifier property are superficially similar to symbol properties
+of Lisp, but there are important differences making them work with
+Scheme's macro system.  Identifier properties are associated with an
+existing binding of an identifier and thus automatically lexically
+scoped.  Each property is keyed by the binding of another identifier,
+so also property keys are lexically scoped.
+</p>
+
+<p>
+The <code>define-property</code> form, which can be used where ever a definition
+can be used, associates properties with identifiers:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">add1</span> (<span style="color: #a020f0;">lambda</span> (x) (+ 1 x)))
+(<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">key</span>)
+(define-property add1 key #'<span style="color: #8b2252;">"value"</span>)
+</pre>
+</div>
+
+<p>
+If the <code>define-property</code> appears in a context evaluated at relative
+phase <i>n</i>, the very right-hand side of <code>define-property</code> is evaluated
+at relative phase <i>n</i> + 1, much like the right-hand side of
+<code>define-syntax</code>.  This means that the property value, <code>"(syntax "value")"</code> in
+this example, is accessible at expand-time, but not a run-time.
+</p>
+
+<p>
+Regardless of the identifier property attached to <code>add1</code>, the
+identifier is still a variable resolving to a procedure adding one to
+its argument:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(add1 2)
+</pre>
+</div>
+
+<pre class="example" id="org257cbd9">
+3
+</pre>
+
+<p>
+Macro transformers can retrieve the values of identifier properties.
+If the need to do so, they have to return a procedure instead of a
+syntax object.  The returned procedure must accept one argument,
+<code>lookup</code> and should return the syntax object which is the result of
+the transformation.  The <code>lookup</code> procedure takes two arguments <code>id</code>
+and <code>key</code>, which must be bound identifiers, and returns the value of
+the identifier property associated to <code>id</code> and keyed by <code>key</code>, or <code>#f</code>
+if there is none:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">let-syntax</span>
+    ([x
+      (<span style="color: #a020f0;">lambda</span> (stx)
+        (<span style="color: #a020f0;">lambda</span> (lookup)
+          (<span style="color: #a020f0;">syntax-case</span> stx ()
+            [(_ key)
+             (<span style="color: #a020f0;">or</span> (lookup #'add1 #'key)
+                 #'<span style="color: #8b2252;">"no-value"</span>)])))])
+  (<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">other-key</span>)
+  (list (x key) (x other-key)))
+</pre>
+</div>
+
+<pre class="example" id="org0c4c571">
+("value" "no-value")
+</pre>
+
+<p>
+While this example theoretically describes how identifier properties
+work, it doesn't show their usefulness.  A more practical example is
+given by another loop macro, modeling general <code>for</code>, we are going to
+present:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">key</span>)
+
+(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">define-iterator</span>
+  (<span style="color: #a020f0;">lambda</span> (stx)
+    (<span style="color: #a020f0;">syntax-case</span> stx ()
+      [(define-iterator name parser-expr)
+       (identifier? #'name)
+       #'(<span style="color: #a020f0;">begin</span>
+           (<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">name</span>
+             (<span style="color: #a020f0;">lambda</span> (stx)
+               (syntax-violation 'name <span style="color: #8b2252;">"invalid use of for keyword"</span> stx)))
+           (define-property name key
+             (<span style="color: #a020f0;">let</span> ([parser parser-expr])
+               (<span style="color: #a020f0;">unless</span> (procedure? parser)
+                 (assertion-violation 'define-iterator <span style="color: #8b2252;">"invalid parser"</span> parser))
+               parser)))])))
+
+(<span style="color: #a020f0;">define-syntax</span> <span style="color: #a0522d;">for</span>
+  (<span style="color: #a020f0;">lambda</span> (stx)
+    (<span style="color: #a020f0;">lambda</span> (lookup)
+      (<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">parse-clause</span>
+        (<span style="color: #a020f0;">lambda</span> (cl)
+          (<span style="color: #a020f0;">syntax-case</span> cl ()
+            [(formals keyword . arg)
+             (identifier? #'keyword)
+             (<span style="color: #a020f0;">let</span> ([keyword #'keyword])
+               (<span style="color: #a020f0;">define</span> <span style="color: #0000ff;">parser</span> (lookup keyword #'key))
+               (<span style="color: #a020f0;">unless</span> (procedure? parser)
+                 (syntax-violation 'for <span style="color: #8b2252;">"invalid for iterator"</span> stx keyword))
+               (<span style="color: #a020f0;">let-values</span> ([(outer-var* var* loop-var*
+                              outer-expr init-expr test-expr loop-expr step-expr)
+                             (parser stx cl)])
+                 (list outer-var* var* loop-var*
+                       outer-expr init-expr test-expr loop-expr step-expr)))])))
+      (<span style="color: #a020f0;">syntax-case</span> stx ()
+        [(_ (clause ...) command ...)
+         (with-syntax ([(((outer-var ...) (var ...) (loop-var ...)
+                          outer-expr init-expr test-expr loop-expr step-expr) ...)
+                        (<span style="color: #a020f0;">map</span> parse-clause #'(clause ...))])
+           #'(<span style="color: #a020f0;">let-values</span> ([(outer-var ...) outer-expr] ...)
+               (<span style="color: #a020f0;">let-values</span> ([(var ...) init-expr] ...)
+                 (<span style="color: #a020f0;">let</span> <span style="color: #0000ff;">f</span> ([var var] ... ...)
+                   (<span style="color: #a020f0;">unless</span> (<span style="color: #a020f0;">or</span> test-expr ...)
+                     (<span style="color: #a020f0;">let-values</span> ([(loop-var ...) loop-expr] ...)
+                       command ...
+                       (<span style="color: #a020f0;">let-values</span> ([(var ...) step-expr] ...)
+                         (f var ... ...))))))))]))))
+
+(define-iterator in-list
+  (<span style="color: #a020f0;">lambda</span> (stx cl)
+    (<span style="color: #a020f0;">syntax-case</span> cl ()
+      [(var _ list-expr)
+       (identifier? #'var)
+       (values #'()
+               #'(tmp)
+               #'(var)
+               #'(values)
+               #'list-expr
+               #'(null? tmp)
+               #'(car tmp)
+               #'(cdr tmp))])))
+
+(define-iterator in-range
+  (<span style="color: #a020f0;">lambda</span> (stx cl)
+    (<span style="color: #a020f0;">syntax-case</span> cl ()
+      [(var _ start-expr end-expr)
+       (identifier? #'var)
+       (values #'(end)
+               #'(i)
+               #'(var)
+               #'end-expr
+               #'start-expr
+               #'(&gt;= i end)
+               #'i
+               #'(+ i 1))])))
+</pre>
+</div>
+
+<p>
+The public API for our new loop facility consists of the <code>for</code> keyword
+and the <code>define-iterator</code> defining keyword.  Moreover, we defined two
+iterator forms, one for going through a list and the other one for going
+through a numeric range.  The loop facility is extensible because the
+user can define more iterator forms using <code>define-iterator</code>.
+</p>
+
+<p>
+A typical use of a <code>for</code> loop can look like the following:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(for ([x in-list '(a b c)]
+      [i in-range 0 10])
+  (display (list x i))
+  (newline))
+</pre>
+</div>
+
+<pre class="example" id="org74ba74c">
+(a 0)
+(b 1)
+(c 2)
+</pre>
+
+<p>
+In a language without a powerful macro system as Scheme possesses it,
+if it doesn't ship a suitable looping construct for our needs, we
+can't do anything except hoping for a future version of the language
+that includes more looping constructs.  In Scheme, on the other hand,
+a small and simple core suffices as we can build syntactic
+abstractions as much as we can build procedural abstractions
+ourselves.  Many advertised "brand new" features of en-vogue or
+not-so-en-vogue languages may sound like a big yawn to a Schemer.
+</p>
+
+<p>
+In our implementation of the <code>for</code> macro above, we used identifier
+properties on the iterator keywords to communicate with the main <code>for</code>
+macro.  This hints at how we can build powerful, extensible
+sub-languages into Scheme.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org114e579" class="outline-2">
+<h2 id="org114e579"><span class="section-number-2">10.</span> Complex examples</h2>
+<div class="outline-text-2" id="text-10">
+</div>
+<div id="outline-container-orge49e13f" class="outline-3">
+<h3 id="orge49e13f"><span class="section-number-3">10.1.</span> <span class="todo TODO">TODO</span> An LR(1) parser generator implemented as a Scheme macro</h3>
+</div>
+</div>
+
+<div id="outline-container-orged7e42e" class="outline-2">
+<h2 id="orged7e42e"><span class="section-number-2">11.</span> Exercises</h2>
+<div class="outline-text-2" id="text-11">
+<ol class="org-ol">
+<li>Write a macro <code>push!</code> such that <code>(push! list-variable expression)</code>
+prepends the value of <code>expression</code> to the list bound to the
+<code>list-variable</code>.</li>
+
+<li>Write a macro <code>when-all</code> such that <code>(when-all test-expression
+   ... expression)</code> evaluates <code>expression</code> only if all
+<code>test-expressions</code> evaluate to <code>#f</code>.  The macro should
+short-circuit the evaluation the <code>test-expressions</code> as soon as one
+evaluates to <code>#f</code>.</li>
+
+<li>Write a macro <code>alist</code> such that <code>(alist key1 value key2 value2
+   ... )</code> expands into a literal expression of the form <code>'((key1
+   value1) (key2 value2) ...)</code>.</li>
+
+<li>Write a macro <code>timestamp</code> such that <code>timestamp</code> expands into a
+number literal counting the number of uses of <code>timestamp</code>.</li>
+
+<li>Rewrite <code>fluid-let</code> as a recursive macro that does not use
+<code>generate-temporaries</code>.</li>
+
+<li>Write a procedure <code>symbolic-identifier=?</code> so that
+<code>(symbolic-identifier=? id1 id2)</code> returns <code>#t</code> if and only if the
+two identifiers <code>id1</code> and <code>id2</code> have the same symbolic name.</li>
+
+<li>Extend the <code>loop</code> macro so that evaluating <code>(continue)</code> skips the
+rest of the current loop iteration and the loop continues with the
+next iteration.</li>
+
+<li>Modify the <code>for</code> macro into a functional form supporting
+user-definable accumulators whose final result are returned by the
+<code>for</code> expression.</li>
+
+<li>Write a pattern matching Scheme macro.</li>
+
+<li>Write a version of the lex scanner generator as a Scheme macro.</li>
+</ol>
+</div>
+</div>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+
+<div class="footdef"><sup><a id="fn.1" class="footnum" href="#fnr.1" role="doc-backlink">1</a></sup> <div class="footpara" role="doc-footnote"><p class="footpara">
+This may change when the R7RS-large standardization effort is
+finished.  Both, R6RS and R7RS-small, are successors (and extensions)
+to R5RS (1998), but R7RS-small was never meant to be seen in isolation
+as a successor to R6RS.  Time will tell whether the R7RS large
+language will be able to replace R6RS when it is finally done.  It is
+planned to include the R6RS macro facility and the extensions
+discussed here in R7RS-large.
+</p></div></div>
+
+<div class="footdef"><sup><a id="fn.2" class="footnum" href="#fnr.2" role="doc-backlink">2</a></sup> <div class="footpara" role="doc-footnote"><p class="footpara">
+While Scheme does not forbid mutation (like ML but unlike
+Haskell), the pitfalls of impure code are well-understood.  Therefore,
+the names of Scheme procedures and syntax that modifies locations in
+the store (the Scheme model of the computer's memory) end with a <code>!</code>
+by convention.
+</p></div></div>
+
+<div class="footdef"><sup><a id="fn.3" class="footnum" href="#fnr.3" role="doc-backlink">3</a></sup> <div class="footpara" role="doc-footnote"><p class="footpara">
+More precicely: as a variable holding a procedure value.
+</p></div></div>
+
+<div class="footdef"><sup><a id="fn.4" class="footnum" href="#fnr.4" role="doc-backlink">4</a></sup> <div class="footpara" role="doc-footnote"><p class="footpara">
+When interactively testing our procedures and syntax (keywords),
+one has to be careful that we have given both the procedure and the
+keyword the same name.  Evaluating one of the definitions will
+overwrite the meaning of the other one.
+</p></div></div>
+
+<div class="footdef"><sup><a id="fn.5" class="footnum" href="#fnr.5" role="doc-backlink">5</a></sup> <div class="footpara" role="doc-footnote"><p class="footpara">
+Such a form is predefined in Chez Scheme, but is not part of the
+Scheme standard.  In fact, Chez Scheme's version properly handles tail
+calls, which our simple version doesn't.
+</p></div></div>
+
+<div class="footdef"><sup><a id="fn.6" class="footnum" href="#fnr.6" role="doc-backlink">6</a></sup> <div class="footpara" role="doc-footnote"><p class="footpara">
+Note that this cannot be done with C preprocessor macros.
+</p></div></div>
+
+<div class="footdef"><sup><a id="fn.7" class="footnum" href="#fnr.7" role="doc-backlink">7</a></sup> <div class="footpara" role="doc-footnote"><p class="footpara">
+The term "history" of an identifier is not an established one
+but was invented for this presentation.
+</p></div></div>
+
+<div class="footdef"><sup><a id="fn.8" class="footnum" href="#fnr.8" role="doc-backlink">8</a></sup> <div class="footpara" role="doc-footnote"><p class="footpara">
+When used in programs or libraries, there is one problem in the
+first approach because of so-called phasing issues.  We will come back
+to this.
+</p></div></div>
+
+<div class="footdef"><sup><a id="fn.9" class="footnum" href="#fnr.9" role="doc-backlink">9</a></sup> <div class="footpara" role="doc-footnote"><p class="footpara">
+In fact, the standard binding constructs in Scheme <code>let</code>,
+<code>let*</code>, or <code>letrec</code> can also be defined as macro keywords in terms of
+the more primitive <code>lambda</code> using the macro facility described in this
+report.
+</p></div></div>
+
+<div class="footdef"><sup><a id="fn.10" class="footnum" href="#fnr.10" role="doc-backlink">10</a></sup> <div class="footpara" role="doc-footnote"><p class="footpara">
+Remember that Scheme has first-class continuation.  But this is
+a topic for a different tutorial.
+</p></div></div>
+
+<div class="footdef"><sup><a id="fn.11" class="footnum" href="#fnr.11" role="doc-backlink">11</a></sup> <div class="footpara" role="doc-footnote"><p class="footpara">
+In-depth advanced information can be found in the paper <a href="http://scheme2011.ucombinator.org/papers/Barzilay2011.pdf">Keeping
+it Clean with Syntax Parameters</a>.
+</p></div></div>
+
+
+</div>
+</div></div>
+<div id="postamble" class="status">
+<p class="author">Author: Marc Nieper-Wißkirchen</p>
+<p class="date">Created: 2023-03-03 Fri 19:03</p>
+<p class="validation"><a href="https://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>

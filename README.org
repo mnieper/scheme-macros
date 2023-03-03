@@ -6,7 +6,35 @@
 
 * Preface
 
-This is a *work-in-progress* tutorial on Scheme macros.
+This document is an introduction to writing powerful macros in Scheme.
+It was initially written on the occasion of a tutorial I give at the
+[[https://bobkonf.de/2023/en/][BOB2023 Konferenz]] in Berlin on 17 March 2023.
+
+The macro facility, especially its built-in /hygiene/, is one of the
+fundamental pillars of the Scheme programming language.  While more
+complicated than the simple token-replacing macros of other languages
+like C, Scheme macros can be written in a way that make them robust
+and so that the abstractions they offer seamless blend into the
+language and cannot be distinguished from syntactic forms built into
+the language.  It is often felt that this expressiveness makes writing
+Scheme macros more complicated (even something of a black art) than
+writing C or Common Lisp macros, for example.  One goal of this
+tutorial is to convince the audience otherwise.
+
+While the Scheme macro facility has always been avant-garde (and this
+is one of the reasons why Scheme was chosen as the implementation
+language for this tutorial), a lot of what is said here also applies
+to languages that provide corresponding features.  It is also a appeal
+to language designers that languages should include a macro facility
+as Scheme does, as this allows for small language cores and enables
+the user to provide their own syntactic abstractions.
+
+Another reason why the Scheme language is used in this tutorial is
+that it has an exceptionally clear semantics, is a compact language,
+and is easy to learn.
+
+The document can both be read as is or used interactively in an Emacs
+session.  In the following section, a possible setup is described.
 
 * Prerequisites
 
@@ -74,3 +102,3298 @@ Emacs.
    '((scheme . t)))
   (setq org-confirm-babel-evaluate nil)
 #+END_SRC
+
+* The Scheme programming language
+
+Scheme is programming language of the Lisp family.  Its defining
+properties are its uniform parenthesized syntax (inherited from Lisp),
+first-class procedures and continuations, lexical scoping, dynamic
+typing, proper tail calls and hygienic macros.  It is primarly a
+functional programming language but allows many other programming
+paradigms.
+
+The Scheme programming language was developed in the 1970s by Guy
+L. Steele and Gerald Jay Sussman.  Since then it has been refined and
+further developed through a series of de facto standards called the
+Revised^{/n/} Report(s) on the Algorithmic Language Scheme (R/n/RS).
+The two current standards are R6RS (2007) and R7RS-small (2013).
+Despite the versioning and the timeline, R6RS is the more detailed,
+more advanced and more modern standard[fn:1].
+
+In this tutorial, we work with the macro facility of R6RS, which is
+far more powerful than the one of R7RS-small, and also discuss some
+proposed or implemented extensions.  Such extensions to the Scheme
+programming language are often proposed, discussed and implemented
+using the [[https://srfi.schemers.org/][Scheme Requests for Implementation]] process, where everyone
+can submit a /SRFI/ extending the Scheme programming language.
+Whenever we speak of the /Scheme/ language in this text, we default to
+the R6RS dialect.
+
+For practical programming, one needs, of course, an implementation.
+Scheme is possibly the programming language with the highest number of
+implementations.  The R6RS language has some very high-quality
+implementations, including [[https://cisco.github.io/ChezScheme/][Chez Scheme]], [[https://www.gnu.org/software/guile/][GNU Guile]], [[https://scheme.fail/][Loko Scheme]], and [[https://racket-lang.org/][Racket]],
+so for any application area, there will be a suitable Scheme system.
+
+* Some simple macros
+
+Let us call a /combination/ an expression in Scheme of the form
+
+#+BEGIN_SRC scheme :eval no
+  (operator operand ...)
+#+END_SRC
+
+An example is given by the following expression evaluating to the answer of life:
+
+#+BEGIN_SRC scheme :exports both :wrap example
+  (* 21 2)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+42
+#+end_example
+
+Such a combination is usually evaluated by evaluating the operator and
+the operands in some unspecific order and by then calling the
+procedure resulting from the operator evaluation with arguments
+resulting from the operand evaluations.
+
+Scheme, however, also possesses special forms, which do not follow
+this evaluation strategy.  An example is given by the conditional ~if~.
+#+BEGIN_SRC scheme :exports both :wrap example
+  (if (number? 2)
+      'ok
+      (/ 1 0))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+ok
+#+end_example
+
+If the conditional were a normal combination, the operands, and ~(/ 1
+0)~ in particular, would have been evaluated first (and
+unconditionally).  Scheme recognizes special forms through the
+operator in first position, namely if it is a keyword (a special type
+of identifier).  The Scheme macro facility allows the programmer to
+define their own keywords.
+
+** Incrementing a variable
+
+Let us ignore for a moment that mutation is frowned upon in functional
+programming and let us assume that we have to frequently increase the
+value of variables in our program.  Given a variable ~x~, this is done
+in Scheme through the following expression:
+#+BEGIN_SRC scheme :eval no
+  (set! x (+ x 1))
+#+END_SRC
+That the variable ~x~ is repeated in this expression is unpleasant
+(and may be considered a violation of the DRY principle), so we want
+an operator akin to C's pre/post-increment operator.  Unfortunately,
+Scheme does not provide such an operator, but, fortunately, it doesn't
+have to because we can build one ourself.
+
+Our first attempt could be to write a procedure (the primary means of
+abstraction in functional programming languages)[fn:4]:
+#+BEGIN_SRC scheme :results silent
+  (define incr!
+    (lambda (x)
+      (set! x (+ x 1))))
+#+END_SRC
+
+This attempt, however, is failed:
+#+BEGIN_SRC scheme :exports both :wrap example
+  (define x 1)
+  (incr! x)
+  x
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+1
+#+end_example
+
+The reason that it doesn't work --- the variable's value is still 1
+and not 2 --- is that ~(incr! x)~ is a normal combination as
+introduced earlier.  As the arguments are evaluated first and the
+procedure is called with their values, in this example, ~incr!~ is
+called with the argument ~1~.  This is then bound to a new variable
+~x~ locally to ~incr!~.  It is this variable, which is increased by 1
+and not the top-level variable.
+
+The solution is, of course, to define ~incr!~ not as a procedure[fn:2]
+but as a keyword.  In the Scheme programming language, the
+~define-syntax~ keyword can be used for it:
+
+#+BEGIN_SRC scheme :exports :results silent
+  (define-syntax incr!
+    (syntax-rules ()
+      ((incr! x)
+       (set! x (+ x 1)))))
+#+END_SRC
+
+This definition says that ~incr!~ is defined to be a new keyword,
+implemented as a macro.  The ~syntax-rules~ line shall be viewed as
+boilerplate for the moment (and we will come back to it later).
+Important are the next two lines.  The form ~(incr! x)~ is a pattern
+saying that the macro matches against a use of the form ~(keyword
+form)~ (where ~keyword~ is necessarily ~incr!~).  When the macro is
+used, the pattern variable ~x~ is bound to the ~form~.  The form
+~(set! x (+ x 1))~ is a template.  When the macro is used, the pattern
+variables in the template are replaced with the forms they are bound
+to and the substituted template is then used in place of the macro.
+
+In the following example, ~(incr! y)~ is effectively substituted by
+~(set! y (+ y 1))~, so we have achieved what we wanted[fn:3]:
+
+#+BEGIN_SRC scheme :exports both :wrap example
+  (define y 10)
+  (incr! y)
+  y
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+11
+#+end_example
+
+As a side note, we see from the discussion that ~set!~ is another
+keyword (like ~if~, it cannot be a procedure for the same reasons why
+our attempt to write ~incr!~ as a procedure doesn't work).
+
+As any other identifier in Scheme, the identifier ~set!~ can also be
+rebound as in the following example:
+
+#+BEGIN_SRC scheme :exports both :wrap example
+  (let ([set! (lambda (x y) (+ x y))])
+    (define x 1)
+    (set! x 2))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+3
+#+end_example
+
+In the body of the ~let~ form, ~set!~ has lost its usual meaning and
+is bound to a procedure adding its two arguments.  It is most
+interesting to see what happens when we use our ~incr!~ macro, which
+refers to ~set!~, in the body of the ~let~ form:
+
+#+BEGIN_SRC scheme :exports both :wrap example
+  (let ([set! (lambda (x y) (/ 1 0))])
+    (define x 1)
+    (incr! x)
+    x)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+2
+#+end_example
+
+This example yields the correct result ~2~, although calling ~set!~
+within the ~let~ body would raise an exception.  The reason for this
+is the already mentioned hygiene of Scheme macros.  The identifier
+~set!~ in the output of the ~incr!~ macro didn't occur in its input
+but came from the macro definition.  Scheme macro hygiene now ensures
+that it still refers to the lexical binding it had where it occured in
+the program source.  Note that the C preprocessor --- as an example
+for a very simple, if not primitive macro facility --- wouldn't have
+ensured it.  Whether a C macro works correctly or not often depends on
+the lexical environment of the macro use site.
+
+We say that hygienic Scheme macros are referentially transparent.
+This is already known from procedures in functional programming
+languages and lexical scoping:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (define f
+    (let ([x 1])
+      (lambda () x)))
+
+  (list (f)
+        (let ([x 2])
+          (f)))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(1 1)
+#+end_example
+
+Wherever the procedure ~f~ is called, it always evaluates to ~1~.
+
+We finish this subsection with another example of hygiene:
+
+#+BEGIN_SRC scheme :exports both :wrap example
+  (let ([set! 2])
+    (incr! set!)
+    set!)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+3
+#+end_example
+
+The result, which is the increment of the original value of the
+variable ~set!~ by one, can again be explained by hygiene and by
+distinguishing the identifier ~set!~ that appears in the macro use and
+the same-named identifier ~set!~ appearing in the macro source.
+Without distinguishing both, the macro use ~(incr! set!)~ is
+transcribed to ~(set! set! (+ set! 1))~.  In this transcription, the
+first ~set!~ originates from the macro transformer and thus still
+refers to the lexical binding it had at that place.  The other two
+occurrences of ~set!~ are copies from the macro input and thus refer
+to the lexical binding of ~set!~ as a let-bound variable.
+
+** A tracing ~let~
+
+Simple loops are often written using the named ~let~ form as in the following example:
+#+BEGIN_SRC scheme :results silent
+  (define fact
+    (lambda (n)
+      (let f ([n n] [a 1])
+        (if (zero? n)
+            a
+            (f (- n 1) (* a n))))))
+#+END_SRC
+
+In order to facilitate debugging, let us define a version of the named
+~let~ form that prints the arguments with which the loop recursion is
+entered and with which it is exited[fn:5].  As ~let~ is a special
+form, this has to be a special form as well, so let us write our second macro:
+
+#+BEGIN_SRC scheme :results silent
+  ;; A form of a named let that prints information about each recursive
+  ;; call.
+  (define-syntax trace-let
+    (syntax-rules ()
+      [(trace-let name ([var expr] ...) body1 ... body2)
+       (let f ([depth 0] [var expr] ...)
+         (define name
+           (lambda (var ...)
+             (f (+ depth 1) var ...)))
+         (indent depth)
+         (display "(")
+         (display 'name)
+         (begin
+           (display " ")
+           (display var))
+         ...
+         (display ")")
+         (newline)
+         (call-with-values
+             (lambda ()
+               body1 ... body2)
+           (lambda val*
+             (indent depth)
+             (fold-left
+              (lambda (sep val)
+                (display sep)
+                (display val)
+                " ")
+              "" val*)
+             (newline)
+             (apply values val*))))]))
+
+  ;; Helper procedure referenced by the macro output of the macro above.
+  (define indent
+    (let ([pattern "| "])
+      (lambda (depth)
+        (do ([i 0 (+ i 1)])
+            ((> i depth))
+          (display (string-ref pattern (mod i 2)))))))
+#+END_SRC
+
+In this macro, the pattern is given by ~(trace-let name ([var expr]
+...) body1 ... body2)~, while the template makes up the bulk of the
+macro.  Already in the pattern, we see a new syntax, the ellipsis
+~...~.  It means that the subpattern preceding it may appear repeated
+zero or more times in the input.  When such a subpattern is matched,
+the contained pattern variables represent lists of forms.
+
+In the template, the ellipsis means to repeat the preceding
+subtemplate as many times as the pattern variables contained in it
+represent forms.  For this to work, every such subtemplate has to
+contain at least one pattern variable, obviously, and all pattern
+variables contained in it have to represent lists of forms of the same
+length.
+
+Note the occurrence of ~begin~ in the macro.  Normally, in a procedure
+body, ~(begin expression ...)~ is equivalent to the list of
+~expressions~, here, however, we have to use it.  The reason is that
+following ellipsis refers the immediately preceding subtemplate, so it
+is crucial that the two display commands (which we both want to
+repeated once per variable) appear in a single form.
+
+When we run the following test, we see the given result printed.
+
+#+BEGIN_SRC scheme :exports both :results output :wrap example
+  (define fact
+    (lambda (n)
+      (trace-let f ([n n])
+        (if (zero? n)
+            1
+            (* (f (- n 1)) n)))))
+  (fact 3)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+|(f 3)
+| (f 2)
+| |(f 1)
+| | (f 0)
+| | 1
+| |1
+| 2
+|6
+#+end_example
+
+We can demonstrate another facet of hygiene with this particular
+macro.  In the macro template, which is part of the macro's source,
+the identifier ~f~ is introduced and is bound by ~let~ appearing next
+to in the source.  In the particular use of the macro above, the
+pattern variable ~name~ represents another identifier name ~f~, namely
+the identifier with that name that appears in the macro use.  Although
+~f~ coming from the macro use is bound in the macro output within the
+scope of the binding of ~f~ coming from the macro text, it does not
+shadow the other ~f~ as this would be a violation of hygiene.
+Instead, the identifier ~f~ coming from the macro text is renamed by
+the Scheme macro expander, at least conceptually (as it isn't inserted
+as a free identifier, the precise name obviously doesn't matter).
+
+The ellipsis can also be used to turn our ~incr!~ macro into one that
+accepts more than one variable to increment:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax incr!
+    (syntax-rules ()
+      ((incr! x ...)
+       (begin
+         (set! x (+ x 1))
+         ...))))
+#+END_SRC
+
+Let us briefly test our new extended macro:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (define x 10)
+  (define y 20)
+  (incr! x y)
+  (list x y)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(11 21)
+#+end_example
+
+The role of ~begin~ in the macro definition of the extended ~incr!~
+differs from the role in our previous use of ~begin~.  Here it is used
+to solve the problem that the template that prescribes the macro
+output has to be a single form.
+
+One can also write the multi-variable ~incr!~ macro without the
+ellipsis by letting the macro expand into itself.  This is not
+necessarily how one would do it, but here it serves as a demonstration
+for further macro techniques:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax incr!
+    (syntax-rules ()
+      ((incr!)
+       (values))
+      ((incr! x . x*)
+       (begin
+         (set! x (+ x 1))
+         (incr! . x*)))))
+#+END_SRC
+
+First of all, this is our first macro with two transcription /rules/,
+where each rule consists of a pattern and of a template.  The pattern
+of the first rule is ~(incr!)~, the pattern of the second rule is
+~(incr! x . x*)~.  Scheme's macro expander tries to match the macro
+input against the patterns in the order in which the patterns appear
+in the ~syntax-rules~ form.
+
+The second new thing is a a pattern of the form ~(incr! x . x*)~,
+which matches an (improper) list of at least two elements, the first
+being the macro keyword and the second one being bound to the pattern
+variable ~x~.  The rest arguments are bound as an (improper) list to
+the pattern variable ~x*~.
+
+Finally, this example demonstrates a recursive macro, that is a macro
+that transforms the input into an instance of itself.  As long as the
+output of a macro use involves a new macro use (possibly with the same
+keyword), the Scheme expander continues with transcribing the macro.
+
+Let us not forget to test the new version of the macro:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (define x 100)
+  (define y 200)
+  (incr! x y)
+  (list x y)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(101 201)
+#+end_example
+
+** Accessing vector locations through variables
+
+A /vector/ in Scheme is a collection of locations in the store that
+can be linearly addressed.  A new vector can be allocated with the
+~vector~ procedure:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (define v (vector 1 2 3))
+  v
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+#(1 2 3)
+#+end_example
+
+Vector elements can be retrieved using ~vector-ref~ and mutated using ~vector-set!~:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (vector-ref v 2)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+3
+#+end_example
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (vector-set! v 1 4)
+  v
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+#(1 4 3)
+#+end_example
+
+Assume that we want to use our ~incr!~ macro to increase the value of
+one vector element.  As ~incr!~ expects a variable as its argument, we
+have make the locations associated to a vector accessible as if they
+were backed up by a variable.  Another feature of the (R6RS) macro
+system comes to our rescue:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (define-syntax v1
+    (identifier-syntax
+     [v1 (vector-ref v 1)]
+     [(set! v1 expr) (vector-set! v 1 expr)]))
+  (incr! v1)
+  v
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+#(1 6 3)
+#+end_example
+
+This macro isn't written with ~syntax-rules~ but uses
+~identifier-syntax~.  This is used to declare a keyword, ~v1~ in our
+case, that is transcribed differently, depending on whether it appears
+in the form ~v1~ or in the form ~(set! v1 expr)~ in the source code.
+
+To access the zeroth or the second element of the vector ~v~, we could
+define identifier macros ~v0~ and ~v2~ similar to ~v1~ but this would
+mean mostly duplicating code and violating the DRY principle.  A
+better approach is to use the Scheme macro system once more.  We
+define a macro that, when used, defines a customized macro[fn:6]:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax define-vector-reference
+    (syntax-rules ()
+      [(define-vector-reference var vec-expr idx-expr)
+       (begin
+         (define vec vec-expr)
+         (define idx idx-expr)
+         (define-syntax var
+           (identifier-syntax
+            [var (vector-ref vec idx)]
+            [(set! var expr) (vector-set! vec idx expr)])))]))
+#+END_SRC
+
+We can now use this macro as follows:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (define-vector-reference initial-element v 0)
+  (incr! initial-element)
+  v
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+#(2 6 3)
+#+end_example
+
+Note that the arguments ~vec-expr~ and ~idx-expr~ can stand for
+arbitrary expressions.  We evaluate these expressions once and store
+their values in the variables ~vec~ and ~idx~ (which will be suitably
+renamed by the macro expander so that they won't clash with user
+defined identifiers with the same name).  If we didn't do this but
+used ~vec-expr~ and ~idx-expr~ everywhere in place where ~vec~ and
+~idx~ appeared in the defined macro, the vector and the index
+expressions would be evaluated every time, the vector reference
+variable would be accessed.
+
+* Syntax objects
+
+The Scheme reports define hygiene and referential transparency for
+macros as follows:
+
+- If a macro transformer inserts a binding for an identifier (variable
+  or keyword) not appearing in the macro use, the identifier is in
+  effect rename throughout its scope to avoid conflicts with other
+  identifiers.
+
+- If a macro transformer inserts a free reference to an identifier,
+  the reference refers to the binding that was visible where the
+  transformer was specified, regardless of any local bindings that may
+  surround the use of the macro.
+
+The examples of the previous section make it hopefully a bit clear
+what is meant by these two points.  Nevertheless, one may think that
+there still must be some magic at work and that it will be impossible
+to prove anything about these macros.  The purpose of this section is
+to disassemble everything and to explain what is going on under the
+hood.
+
+** Identifiers
+
+The Lisp languages, and thus Scheme as well, are homoiconic
+programming languages, which means that if the program's internal
+representation is a datum of the language.  In first approximation,
+the internal representation of a Scheme expression (as of a Scheme
+program) is a Scheme datum value.  For example, the program
+(expression)
+
+#+BEGIN_SRC scheme :eval no
+  (let ([x 1])
+    (+ x 2))
+#+END_SRC
+
+is represented by a list whose first element is the symbol ~let~,
+whose second element is a list of a list with two elements and whose
+third element is a list of the three data ~+~, ~x~, and ~2~.
+
+Due to existence of hygienic macros we have to amend this traditional
+picture.  Consider the following example.
+
+#+BEGIN_SRC scheme :eval no
+  (let ([set! 10])
+    (incr! set!)
+    set!)
+#+END_SRC
+
+To evaluate the ~let~ expression, the macro use of ~incr!~ has to be
+expanded first.  After the expansion, the expression would look like
+
+#+BEGIN_SRC scheme :eval no
+  (let ([set! 10])
+    (set! set! (+ set! 1))
+    set!)
+#+END_SRC
+
+if Scheme expressions were represented by Scheme datum values and
+within, identifiers were represented by symbols.  It is obvious that
+this cannot be how the Scheme expander works because there would be no
+way to tell which copy of the symbol ~set!~ refers to which binding.
+The point is that identifiers cannot be represented by symbols, which
+only have a symbolic name.  Instead, to an /identifier/ both a
+symbolic name and a lexical context are associated.  When the binding
+of an identifier is looked up, it is looked up in the lexical context
+associated with it.
+
+In Scheme, symbols are first-class values.  The can be created using
+the syntax ~(quote name)~, which can be abbreviated to ~'name~:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  'red
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+red
+#+end_example
+
+The same is true for identifiers.  They are created just like symbols
+but use the syntax ~(syntax identifier)~, which can be abbreviated to
+~#'identifier~, instead:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  #'x
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+#<syntax x>
+#+end_example
+
+(The format of the output, ~#<syntax x>~, is implementation-specific,
+because identifiers are not Scheme datum values and thus have no
+standardized or faithful written representation.)
+
+Evaluating of the form ~(syntax x)~ (or ~#'x~) means the following for
+the Scheme system: construct and return an identifier with the
+symbolic name ~x~ and with the lexical context at the place of the ~x~
+appearing in the ~syntax~ form.  We have to be aware of that the term
+~identifier~ can be used in two (slightly) different contexts: When we
+refer to ~set!~ as an identifier in the example above, we speak about
+a token being part of the code.  When we refer to the expression ~#'x~
+evaluating to an identifier, we speak about a value of the language.
+The expression ~#'x~ contains an identifier in the first sense
+(speaking about the language) and evaluates to an identifier (as a
+value of the language).
+
+The procedure ~syntax->datum~ can be used to convert an identifier to
+a symbol, namely its underlying symbolic name:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (syntax->datum #'x)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+x
+#+end_example
+
+There are no standard procedures that allow us to look up the binding
+of an identifier, but we can compare identifiers.  Scheme defines two
+equivalence relations, realized by the predicates ~bound-identifier=?~
+and ~free-identifier=?~.  Two identifiers are "~bound-identifier=?~"
+if they are interchangeable when they appear bound in the output of a
+macro.  Two identifiers are "~free-identifier=?~" if they are
+interchangeable when they appear free in the output of a macro.
+Neither equivalence implies the other.  It will become clearer in the
+course of this tutorial what this means, but some experiments will
+already give some understanding:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (list (bound-identifier=? #'x #'x) (bound-identifier=? #'x #'y))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(#t #f)
+#+end_example
+
+The two identifiers to which the two evaluations of ~#'x~ in the first
+argument to ~list~ evaluate are therefore "~bound-identifier=?~" while
+the differently named identifiers ~#'x~ and ~#'y~ (more precisely: the
+identifiers returned by these expressions) are not.  It is tempting to
+say that the two (or three) instances of ~#'x~ evaluate to the /same/
+identifier, but for this to make sense, some equivalence relation
+would have had to be fixed earlier.
+
+Let us now consider two simple examples for ~free-identifier=?~:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (let ([x 1])
+    (free-identifier=? #'x #'x))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+#t
+#+end_example
+
+If the identifiers to both instances of ~#'x~ evaluate were inserted
+in the code as free identifiers they both would refer to the variable
+binding of the identifier ~x~ introduced by ~let~.
+
+The second example is a bit more interesting:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (let ([x 1]
+        [y 1])
+    (free-identifier=? #'x #'y))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+#f
+#+end_example
+
+The answer is ~#f~ (for false) because although the values of the two
+variables ~x~ and ~y~ are both initialized to ~1~ they are bound to
+different locations in the store (which can be exhibited by mutating
+one of the two variables.
+
+So far, in all examples ~bound-identifier=?~ seems to give the same
+result as ~free-identifier=?~.  That this is not true is shown in the
+next example.
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (let ([x 1])
+    (define outer-x #'x)
+    (let ([x 2])
+      (define inner-x #'x)
+      (list (bound-identifier=? outer-x inner-x)
+            (free-identifier=? outer-x inner-x))))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(#t #f)
+#+end_example
+
+Inserting ~inner-x~ as a free identifier would not be equivalent to
+inserting ~outer-x~ because the former would refer to the binding of
+the variable with value ~2~ and the latter to the binding of the
+variable with value ~1~.  Thus identifiers that are
+"~bound-identifier=?~" are not necessarily "~free-identifier~".  We
+hope that the connection of ~free-identifier=?~ to the second hygiene
+condition, the one about inserting free references to an identifier,
+is apparent.
+
+Again so far, it seems that identifiers are "~bound-identifier=?~" if
+and only if they have the same symbolic name.  One implication is
+correct, namely that identifiers that are interchangeable as bound identifiers
+must have the same symbolic name, but the other implication is not.  To show this, we have to employ a macro:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (let ([x 1])
+    (let-syntax
+        ([outer-x (identifier-syntax #'x)])
+      (define inner-x #'x)
+      (list (bound-identifier=? outer-x inner-x)
+            (free-identifier=? outer-x inner-x))))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(#f #t)
+#+end_example
+
+Two remarks about the example code are in order before we discuss the
+result.  The binding form ~let-syntax~ is to ~let~ as ~define-syntax~
+is to ~define~; in other words, it allows us to locally bind keywords
+to macro (transformers).  Furthermore, we employ a short form of
+~identifier-syntax~ here, which defines no ~set!~ semantics but just
+replaces an occurrence of the keyword ~outer-x~ with ~#'x~.
+
+Both the identifier ~x~ in the definition of the macro ~outer-x~ and
+the identifier ~x~ in the definition of the variable ~inner-x~ refer
+to the binding of ~x~ introduced by the outer ~let~, which explains
+that the values of ~outer-x~ and ~inner-x~ are "~free-identifier=?~".
+But they are not "~bound-identifier=?~", so this example shows that
+identifiers that "~free-identifier=?~" need not necessarily be
+"~bound-identifier=?~".
+
+The reason why they cannot be "~bound-identifier=?~" is that the first
+hygiene condition about inserting bindings for an identifier would be
+violated otherwise.  Consider the following example:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (let-syntax
+      ([add1
+        (syntax-rules ()
+          [(add1 y)
+           (let ([x 1])
+             (+ x y))])])
+    (let ([x 2])
+      (add1 x)))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+3
+#+end_example
+
+The identifier ~x~ appearing in the macro template is inserted as a
+bound identifier in the macro output and thus is in effect renamed to
+avoid conflict with the identifier ~x~ appearing in the macro use.
+Renaming means that the two identifiers named ~x~ cannot be
+"~bound-identifier=?~" because they would otherwise be interchangeable
+as bound identifiers.
+
+Scheme implements this hygiene condition by assigning to identifiers
+besides their symbolic name and their lexical context another
+property, namely their historic context (or just history)[fn:7].  The
+history of an identifier is the information when the identifier was
+first introduced in the program.  All identifiers in the program
+source have the same history --- they were already there when the
+program was started.  An identifier introduced by a macro
+transformation (as part of its output) has a different history than
+identifiers that were already present in the program source.
+Identifiers introduced by different macro transformations have
+different histories and all identifiers introduced by the same macro
+transformation have the same history.
+
+Let us take another view at this example:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (let ([x 1])
+    (let-syntax
+        ([outer-x (identifier-syntax #'x)])
+      (define inner-x #'x)
+      (list (bound-identifier=? outer-x inner-x)
+            (free-identifier=? outer-x inner-x))))
+#+END_SRC
+
+The identifier ~x~ appears three times in the source.  All three
+identifiers have the same history.  When the macro ~outer-x~ is
+expanded, the identifier ~x~ is introduced in the macro output (as
+part of the expression ~#'x~) and this particular identifier was not
+part of the macro input, so the introduced identifier ~x~ has a
+different history than the identifier to which ~inner-x~ is bound.
+
+We are now in a situation to give alternative definitions for
+~bound-identifier=?~ and ~free-identifier=?~: Two identifiers are
+"~bound-identifier=?~" if they have the same symbolic name and the
+same history.  Two identifiers are "~free-identifier=?~" if they refer
+to the same binding in their respective lexical contexts.  (An unbound
+identifier is, by definition, "~free-identifier=?~" to another
+identifier if the other identifier is also unbound and has the same
+symbolic name.)
+
+Scheme also allows to fudge identifiers.  The procedure
+~datum->syntax~ can turn a symbol into an identifier with that
+symbolic name.  For that, the user has to provide a lexical context
+and a history.  This is done by giving a "template" identifier from
+which the context is taken.
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (let ([x 1])
+    (define outer-x #'x)
+    (let ([x 2])
+      (define outer (datum->syntax outer-x 'x))
+      (list (bound-identifier=? outer-x outer)
+            (free-identifier=? outer-x outer))))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(#t #t)
+#+end_example
+
+In this example, the identifier ~outer~ is an identifier with the
+symbolic name ~x~ and with the context as if it was introduced where
+~x~ appears in the definition of ~outer-x~.
+
+In the following example, the fudged identifier with the symbolic name
+~y~ has the same history as the identifier ~x~ appearing the macro use
+of ~as-y~, and thus the same history as the identifier ~y~ appearing
+in the call to ~bound-identifier=?~.
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (let-syntax
+      ([as-y
+        (syntax-rules ()
+          [(as-y x) (datum->syntax #'x 'y)])])
+    (bound-identifier=? #'y (as-y x)))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+#t
+#+end_example
+
+** Constructing syntax objects
+
+In the previous section we learned that Scheme code cannot be
+represented by a Scheme datum value (a Scheme value that has a written
+representation like a list, a number, or a symbol), at least not
+during the expansion process, as identifiers cannot be represented by
+symbols.
+
+The objects that do represent Scheme forms are called /syntax
+objects/.  The basic idea is that a syntax object is like a datum
+value but with identifiers instead of symbols.  So a list of
+identifiers or a vector of a number and an identifier, or a single
+string or identifier are all syntax objects.  Moreover, there can be a
+/wrap/ around a nonidentifier syntax object.
+
+Formally, syntax objects can inductively be defined as follows:
+
+- A nonpair, nonvector, or nonsymbol value is a syntax object.
+- A pair of syntax objects is a syntax object.
+- A vector of syntax objects is a syntax object.
+- An identifier is a syntax object.
+- A wrapped nonpair, nonvector, or nonsymbol value is a syntax object.
+- A wrapped pair or vector of syntax objects is a syntax object.
+
+To each syntax object corresponds a (datum) value by stripping all
+wraps and converting all identifiers to their symbolic names.  The
+Scheme procedure that does this conversion is ~syntax->datum~.  We
+have already seen it converting identifiers to symbols.  It is also
+used in effect by the ~quote~ special form: When Scheme evaluates an
+expression like ~(quote (1 2 foo))~, the (internal) procedure
+responsible for expanding or evaluating this expression will receive a
+syntax object whose underlying datum value is ~(1 2 foo)~ and will
+evaluate to this underlying value.
+
+We can construct the syntax object in the above example as a Scheme value:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (list 1 2 #'foo)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(1 2 #<syntax foo>)
+#+end_example
+
+It is a syntax object because it is a list of syntax objects (and
+Scheme lists are built from pairs and the empty list) and it has the
+expected corresponding (datum) value:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (syntax->datum (list 1 2 #'foo))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(1 2 foo)
+#+end_example
+
+The predicate ~identifier?~ is a Scheme procedure that can be used to
+test whether a syntax object is an identifier or not:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (list (identifier? 1) (identifier? (list #'x)) (identifier? #'x))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(#f #f #t)
+#+end_example
+
+In the previous section, we saw how to use ~syntax~ keyword
+(abbreviated by ~#'~) can be used to create identifiers.  In fact, the
+argument to the ~syntax~ keyword does not have to be symbol but can be
+any datum, so a ~syntax~ expression can be used to build more
+complicated syntax objects:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (syntax (1 2 foo))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+#<syntax (1 2 foo)>
+#+end_example
+
+As the result shows, this is a wrapped syntax object, namely a wrapped
+list (of syntax objects).  The Scheme system uses the wrap to attach
+source location information to the syntax object (facilitating
+debugging), and the expander makes use of the fact that syntax objects
+can be opaque (wrapped) to provide optimal algorithmic complexity for
+the expansion process.
+
+Whether wrapped or not, we can apply ~syntax->datum~ on this syntax object:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (syntax->datum #'(1 2 foo))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(1 2 foo)
+#+end_example
+
+Here, we used again the abbreviation ~#'~ for ~syntax~.
+
+** Destructing syntax objects
+
+The syntax object returned by ~#'(1 2 foo)~ cannot be destructed using
+list procedures like ~car~ and ~cdr~ although it represents a list as
+it is wrapped.  Scheme offers a special form, ~syntax-case~ to
+destruct syntax objects.  A ~syntax-case~ form contains clauses, each
+consisting of a pattern of the form we already saw in connection with
+~syntax-rules~ and an expression.  An input syntax object is matched
+against the patterns in order and the expression corresponding to the
+first pattern that matches is evaluated:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (syntax-case #'(1 2 foo) ()
+    [(a b) 'case-1]
+    [(a b (c d)) 'case-2]
+    [(2 b c) 'case-3]
+    [(a b c d e ...) 'case-4]
+    [(a b c) 'case-5]
+    [x 'case-6])
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+case-5
+#+end_example
+
+(The empty list ~()~ appearing in the second argument of ~syntax-case~
+will be explained soon and plays the same role as the empty list we
+saw in our ~syntax-rules~ examples.)
+
+The pattern of the last clause would have also matched but the
+matching ends as soon as a matching clause (the fifth in this
+example) is found.  (The system will raise an exception if no match
+can be found.)
+
+Let us try to distinguish the syntax objects returned by ~#'(1 2 foo)~ and ~#'(1 2 bar)~.
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (syntax-case #'(1 2 foo) ()
+    [(a b bar) 'bar]
+    [(a b foo) 'foo])
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+bar
+#+end_example
+
+That we don't get the expected (or hoped for) result is because
+~syntax-case~ (as ~syntax-rules~) does treat every identifier
+appearing in a pattern as a pattern variable by default.  Thus, in the
+first pattern, ~bar~ is not matched against ~foo~ but ~bar~ is bound
+to ~foo~.  We can change this behavior by adding the identifiers that
+we want to match literally to the list that appeared as the empty list
+so far:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (syntax-case #'(1 2 foo) (bar foo)
+    [(a b bar) 'bar]
+    [(a b foo) 'foo])
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+foo
+#+end_example
+
+The equivalence predicate that ~syntax-case~ uses to compare an input
+identifier against a literal identifier is ~free-identifier=?~.  In
+the case of the example, both ~bar~ and ~foo~ are unbound and we
+recall that unbound identifiers are "~free-identifier=?~" if and only
+if they have the same symbolic name.  The next example demonstrates
+how the binding comes into play:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (let ([foo 1])
+    (define input
+      (let ([foo 2])
+        #'(1 2 foo)))
+    (syntax-case input (foo)
+      [(a b foo) 'match]
+      [(a b c) 'no-match]))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+no-match
+#+end_example
+
+We have now the tool to dispatch on the structure of a syntax object,
+but what we also need is a way to get hold of the individual
+components of a syntax object.  This is done with pattern variables
+(~a~, ~b~, and ~c~ in the example above).  We said above that a
+pattern variable is bound to the syntax object it is matched against.
+This scope of this binding is the expression following the pattern in
+the ~syntax-case~ clause.  Just a keywords are not ordinary variables,
+pattern variables are neither.  They may only be referenced inside the
+~syntax~ form as in the following example:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (syntax-case #'(1 x) ()
+    [(1 y) #'y])
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+#<syntax x>
+#+end_example
+
+Here, ~#'y~ does not resolve to the identifier ~y~ (because ~y~ is
+bound to a pattern variable) but to the syntax object to which ~y~ is
+bound, which is the value of ~#'(1 x)~.
+
+Mixing of pattern variables and non-pattern variable identifiers in
+the same ~syntax~ expression also works:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (syntax-case #'(1 x) ()
+    [(1 a) #'(b a)])
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(#<syntax b> #<syntax x>)
+#+end_example
+
+As one can see, the result is not a wrapped syntax object but a list
+of two syntax objects.  This is no coincidence.  When a pattern
+variable appears in a ~syntax~ template, all the substructure in which
+the pattern variable is replaced by what it was matched against, is
+unwrapped, so ordinary list and vector accessor procedures can be
+used.  The following is another example:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (syntax-case #'(1 2 3) ()
+    [(1 x ...) #'(a x ... b c)])
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(#<syntax a> #<syntax 2> #<syntax 3> . #<syntax (b c)>)
+#+end_example
+
+As can be seen, the pattern variable ~x~ is matched against the list
+of syntax objects consisting of ~2~ and ~3~.  Up to the part (and
+including it) where ~x~ is substituted, the syntax object is
+unwrapped.  The ellipsis in the ~syntax~ template works as the
+ellipsis in the ~syntax-rules~ templates (we will see below why this
+is no coincidence).
+
+In particular, we can use list procedures to reference
+individual elements or to calculate lengthes:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (define syntax-length
+    (lambda (stx)
+      (syntax-case stx ()
+        [(x ...)
+         (length #'(x ...))])))
+
+  (syntax-length #'(a b c d))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+4
+#+end_example
+
+We have already seen how literals in ~syntax-case~ can be used for
+literal matching of identifiers (using ~free-identifier=?~).
+Otherwise, ~syntax-case~ only matches per structure.  If we want to
+match structural element using special rules, /fenders/ can be used as
+in the following example:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (syntax-case #'(define 3 (+ 1 2)) ()
+    [(define id expr)
+     (identifier? #'id)
+     'ok]
+    [_ 'error])
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+error
+#+end_example
+
+The fender is the expression between the pattern and the final
+expression in the first clause of ~syntax-rules~.  If present, it is
+evaluated when the pattern matches.  If the evaluation yields ~#f~,
+this clause is skipped and matching is continued with the next clause.
+The scope of the pattern variables of a pattern includes a fender if
+present.
+
+The (sub)pattern ~_~ matches anything (like a pattern variable) but
+does not bind a pattern variable.
+
+* Syntax-case macros
+
+** Macro transformers
+
+We started this tutorial with writing macros and discussing a number
+of some example of such macros.  Somehow, we seemed to have deviated
+by talking about identifiers, syntax objects, and their construction
+and destruction.  In this section we will see how ~syntax-case~ and
+~syntax~ can be employed to write powerful macros.  In fact, they are
+the building blocks of macro transformers.
+
+To make use of the forms ~syntax-case~ and ~syntax~, we have to
+understand what actually goes into a ~define-syntax~ definition.  The
+general form of a syntax definition is ~(define-syntax identifier
+transformer-expression)~ (the analogous holds for bindings in a
+~let-syntax~ expression).  When the Scheme expanders encounters a
+~define-syntax~ definition, it evaluates the ~transformer-expression~,
+which is an ordinary Scheme expression.  It's value must be a macro
+transformer, which is then bound to the keyword given by ~identifier~.
+
+Now, a macro transformer is just an ordinary Scheme procedure taking
+one argument, a syntax object, and returning one value, another syntax
+object.  The input syntax object represents the macro use form, the
+output syntax object represents the transcribed macro use.  Let us
+check this:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (let ([x 41])
+    (define-syntax always-42
+      (lambda (stx)
+        (syntax (+ 1 x))))
+
+    (+ always-42
+       (always-42 400)))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+84
+#+end_example
+
+Independently of how the macro is used --- that is, independently of
+what ~stx~ is ---, the macro transformer of this example always
+returns the expression ~(+ 1 x)~ (evaluating to ~42~).  Note that we
+could have equivalently written ~#'(+ 1 x)~ instead of ~syntax~.
+
+If we want to make the macro output dependent on the macro input, we
+have to employ ~syntax-case~ to destruct the input syntax object.  Let
+us first define a macro transformer that uses ~syntax-case~:
+
+#+BEGIN_SRC scheme :results silent
+  (define f
+    (lambda (stx)
+      (syntax-case stx ()
+        [(_ x ...)
+         (list #'quote (list (length #'(x ...)) #'(x ...)))])))
+#+END_SRC
+
+We can test this procedure as any other procedure:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (f #'(q a b c))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(#<syntax quote> (3 (#<syntax a> #<syntax b> #<syntax c>)))
+#+end_example
+
+The output is thus a syntax object of the form ~(quote (n x ...))~
+where the ~x~ denote the arguments following the head element of the
+syntax object argument to ~f~ and ~n~ is the number of these
+arguments.  The expression that yields the syntax object in the
+procedure ~f~ above is not very readable.  Because of that, Scheme
+also offer a ~quasisyntax~ form (abbreviated with ~#`~), which is to
+~syntax~ as ~quasiquote~ is to ~quote~:
+
+#+BEGIN_SRC scheme :results silent
+  (define f
+    (lambda (stx)
+      (syntax-case stx ()
+        [(_ x ...)
+         #`(quote (#,(length #'(x ...)) x ...))])))
+#+END_SRC
+
+Even more readable becomes the expression if pattern variables are
+used, which can not only be bound by ~syntax-case~ but also by
+~with-syntax~, which is for pattern variables what ~let~ is for
+ordinary variables:
+
+#+BEGIN_SRC scheme :results silent
+  (define f
+    (lambda (stx)
+      (syntax-case stx ()
+        [(_ x ...)
+         (with-syntax ([n (length #'(x ...))])
+           #'(quote (n x ...)))])))
+#+END_SRC
+
+In fact, ~with-syntax~ is not a primitive form but can be expressed in
+terms of ~syntax-case~:
+
+#+BEGIN_SRC scheme :eval no
+  (define-syntax with-syntax
+    (syntax-rules ()
+      [(with-syntax ([p e0] ...) e1 ... e2)
+       (syntax-case (list e0 ...) ()
+         [(p ...)
+          (let ()
+            e1 ... e2)])]))
+#+END_SRC
+
+In whatever way we write the procedure ~f~, we can then use it to
+define an actual macro:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax quote/length f)
+#+END_SRC
+
+Of course, instead of naming the macro transformer and just
+referencing to it in the right hand side of ~define-syntax~, we could
+have equally well written the transformer procedure expression inline.
+The advantage of the former is that the transformer procedure can then
+be easily tested using the usual tools, the advantage of the latter is
+that it is more compact[fn:8].
+
+Let's test our macro:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (quote/length a b c)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(3 a b c)
+#+end_example
+
+It should be noted that the calculation of the length, ~3~ in this
+case, happens at expand-time (so in the compiler if we use one).  In
+fact, a macro can be understood as a compiler for a sublanguage and
+that is be plugged into the Scheme system to extend the language.
+
+We now have amassed enough knowledge to give the definition of
+~syntax-rules~.  As the right hand side of ~define-syntax~ expects a
+procedure expression, a ~syntax-rules~ form must evaluate to a
+procedure.  And, in fact, ~syntax-rules~ can be defined as follows:
+
+#+BEGIN_SRC scheme :eval no
+  (define-syntax syntax-rules
+    (lambda (stx)
+      (syntax-case stx ()
+        [(_ (lit ...) [(k . p) t] ...)
+         (for-all identifier? #'(lit ... k ...))
+         #'(lambda (x)
+             (syntax-case x (lit ...)
+               [(_ . p) #'t] ...))])))
+#+END_SRC
+
+The ~syntax~ expression following the fender of the ~syntax-case~
+clause shows that a ~syntax-rules~ expression evaluates to a
+procedure.  There is another instance of ~syntax~ (~#'~) within the
+template of the outer ~syntax~ expression.  This is because procedure
+to which a ~syntax-rules~ expression evaluates outputs itself a syntax
+object.
+
+One more thing is remarkable:  Each ~syntax-rules~ pattern is of the
+form ~(k . p)~; more precisely, it can only match (syntax) pairs whose
+head element is an identifier, that is macro uses of exactly this
+form.  Notably, the pattern variable ~k~ isn't referenced in the
+output.  This is because a ~syntax-rules~ pattern ignores the pattern
+variable that corresponds to the keyword position.  In particular, the
+following two syntax definitions are equivalent:
+
+#+BEGIN_SRC scheme :eval no
+  (define-syntax incr!
+    (syntax-rules ()
+      [(incr! x) (set! x (+ x 1))]))
+#+END_SRC
+
+#+BEGIN_SRC scheme :eval no
+  (define-syntax incr!
+    (syntax-rules ()
+      [(_ x) (set! x (+ x 1))]))
+#+END_SRC
+
+This is in contrast to a ~syntax-case~ expression, which doesn't tread
+the keyword position in a special way.  This is the reason why we
+often use ~_~ at the keyword position in ~syntax-case~ expressions for
+macro transformers.
+
+It is a good time to finally give the definition of our initial
+~incr!~ macro in terms of ~syntax-case~:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax incr!
+    (lambda (stx)
+      (syntax-case stx ()
+        [(_ x)
+         (identifier? #'x)
+         #'(set! x (+ x 1))])))
+#+END_SRC
+
+It is instructive to go through the above definition of the
+~syntax-rules~ keyword and see how the earlier definition using
+~syntax-rules~ expands into the later definition using ~syntax-case~.
+The only line that is not present with the ~syntax-rules~ definition
+is the fender ~(identifier #'x)~, which has no equivalent for
+~syntax-rules~.  This fender ensures that a syntax error is reported
+early if the user tries to use this macro in a non-sensible form like
+in ~(incr! 2)~.
+
+** A fluid ~let~
+
+We should finally move past the ~incr!~ macro.  We already remarked
+that mutation (which ~incr!~ does) is frowned upon.  To be more
+precise, what makes problems is mutation with unlimited extent.
+Mutation with dynamic extent, on the other hand, can be used to
+implement dynamically scoped variables, which are also called fluids
+and do not have all the problems associated with unbound mutation.
+
+It is probably best to explain it with an example.  For this, we
+define a new binding-like construct, named ~fluid-let~[fn:9]:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax fluid-let
+    (lambda (stx)
+      (syntax-case stx ()
+        [(_ [(x e)] b1 ... b2)
+         (identifier? #'x)
+         #'(let ([y e])
+             (define swap!
+               (lambda ()
+                 (let ([t x])
+                   (set! x y)
+                   (set! y t))))
+             (dynamic-wind
+               swap!
+               (lambda ()
+                 b1 ... b2)
+               swap!))])))
+#+END_SRC
+
+Let us briefly check the output of the following expression:
+
+#+BEGIN_SRC scheme :results output :export both :wrap example
+  (let ([x 1])
+    (define show
+      (lambda ()
+        (display x)
+        (newline)))
+    (show)
+    (fluid-let ([x 2])
+      (show))
+    (show))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+#+end_example
+
+The ~dynamic-wind~ procedure takes three thunks (procedures that take
+no arguments) as arguments.  When ~dynamic-wind~ is called, it calls
+the three thunks in that order and finally returns the results of the
+call to the second, the middle, thunk.  The reason why we didn't write
+~(begin (swap!) ((lambda () b1 ... b2)) (swap!))~ is that
+~dynamic-wind~ arranges for calling the enter and exit thunk even in
+the presence of non-local control flow[fn:10].
+
+The variable ~y~ is used by the macro to store the old value of ~var~
+in it before the latter is mutated.  As ~y~ does not come from the
+macro input, it won't conflict with the definition of an identifier
+named ~y~ surrounding the use of ~fluid-let~.  Likewise, the temporary
+variable ~t~ won't conflict regardless of what variable the pattern
+variable ~x~ stands for.
+
+Our ~fluid-let~ can "bind" exactly one variable.  If we want to change
+more than value, say two, we have to rewrite our macro:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax fluid-let
+    (lambda (stx)
+      (syntax-case stx ()
+        [(_ [(x1 e1) (x2 e2)] b1 ... b2)
+         (for-all identifier? #'(x1 x2))
+         #'(let ([y1 e1] [y2 e2])
+             (define swap!
+               (lambda ()
+                 (let ([t x1])
+                   (set! x1 y1)
+                   (set! y1 t))
+                 (let ([t x2])
+                   (set! x2 y2)
+                   (set! y2 t))))
+             (dynamic-wind
+               swap!
+               (lambda ()
+                 b1 ... b2)
+               swap!))])))
+#+END_SRC
+
+#+BEGIN_SRC scheme :results output :export both :wrap example
+  (let ([a 1] [b 2])
+    (define show
+      (lambda ()
+        (display (list a b))
+        (newline)))
+    (show)
+    (fluid-let ([a 3] [b 4])
+      (show))
+    (show))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(1 2)
+(3 4)
+(1 2)
+#+end_example
+
+This is, of course, a non-solution because we still can't pass three
+variables and have also lost the ability of just passing one
+variable.  Possibly, the ellipsis can help as in the following
+attempt:
+
+#+BEGIN_SRC scheme :eval no
+  (define-syntax fluid-let
+    (lambda (stx)
+      (syntax-case stx ()
+        [(_ [(x e) ...] b1 ... b2)
+         (for-all identifier? #'(x ...))
+         #'(let ([y e] ...)
+             (define swap!
+               (lambda ()
+                 (let ([t x])
+                   (set! x y)
+                   (set! y t))
+                ...))
+             (dynamic-wind
+               swap!
+               (lambda ()
+                 b1 ... b2)
+               swap!))])))
+#+END_SRC
+
+However, this won't quite work.  The problem is that there is only one
+identifier ~y~ introduced and not one identifier per each fluid
+variable.  The canonical solution Scheme offers here is the
+~generate-temporaries~ procedure, which takes a list or a syntax
+object representing a list and returns a list of as many identifiers,
+each with its unique history so that they won't be pairwise
+"~bound-identifier=?~" or to any other identifier:
+
+#+BEGIN_SRC scheme :results scalar :export both :wrap example
+  (with-syntax ([(x y) (generate-temporaries '(a b))])
+    (list (identifier? #'x)
+          (identifier? #'y)
+          (bound-identifier=? #'x #'y)))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(#t #t #f)
+#+end_example
+
+Here, the list ~(a b)~ has two elements, so ~generate-temporaries~
+creates two identifiers, which we bound using ~with-syntax~ to the
+pattern variables ~x~ and ~y~.
+
+With this tool at our disposal, we can finally write a version of
+~fluid-let~ that works with an arbitrary number of variables:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax fluid-let
+    (lambda (stx)
+      (syntax-case stx ()
+        [(_ [(x e) ...] b1 ... b2)
+         (for-all identifier? #'(x ...))
+         (with-syntax
+             ([(y ...) (generate-temporaries #'(x ...))])
+           #'(let ([y e] ...)
+               (define swap!
+                 (lambda ()
+                   (let ([t x])
+                     (set! x y)
+                     (set! y t))
+                   ...))
+               (dynamic-wind
+                 swap!
+                 (lambda ()
+                   b1 ... b2)
+                 swap!))]))))
+#+END_SRC
+
+#+BEGIN_SRC scheme :results output :export both :wrap example
+  (let ([a 1] [b 2])
+    (define show
+      (lambda ()
+        (display (list a b))
+        (newline)))
+    (show)
+    (fluid-let ([a 3] [b 4])
+      (show))
+    (show))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(1 2)
+(3 4)
+(1 2)
+#+end_example
+
+** Implementing a variant type in Scheme
+
+It is time to demonstrate more involved macros to highlight some
+features of the Scheme macro system and how it leads to extensibility
+of the language.
+
+To have some use case at hand, let us assume that we deal with binary
+trees that carry a value at each (internal) node and at each leaf.  We
+can use the Scheme record facility to provide the necessary data
+types, implementing an abstract tree interface:
+
+#+BEGIN_SRC scheme :results silent
+  (define-record-type node (fields left value right))
+  (define-record-type leaf (fields value))
+#+END_SRC
+
+We can build a tree using the constructors defined by the above
+record-type definitions:
+
+#+BEGIN_SRC scheme :results silent
+  (define t
+    (make-node
+     (make-node (make-leaf 4) 2 (make-leaf 1))
+     8
+     (make-leaf -1)))
+#+END_SRC
+
+While creating a tree by hand in this way is doable, it is not very
+neat.  It would be nice if we could give the tree above in simple,
+parenthesized syntax as follows:
+#+BEGIN_SRC scheme :eval no
+  (((4)
+    2
+    (1))
+   8
+   (-1))
+#+END_SRC
+
+In other words, (internal) nodes are given by lists of three elements,
+and leafs by lists of one element.  To achieve this, one might want to
+write a procedure as the following one:
+
+#+BEGIN_SRC scheme :results silent
+  (define make-tree
+    (lambda (e)
+      (define n (length e))
+      (cond
+       [(= n 3)
+        (make-node (make-tree (car e))
+                   (cadr e)
+                   (make-tree (caddr e)))]
+       [(= n 1) (make-leaf (car e))]
+       [else
+        (assert #f)])))
+#+END_SRC
+
+We can then build our tree ~t~ as follows:
+
+#+BEGIN_SRC scheme :results silent
+  (define t
+    (make-tree
+     '(((4)
+        2
+        (1))
+       8
+       (-1))))
+#+END_SRC
+
+The ~quote~ (necessary so that Scheme does not try to evaluate our
+tree description as an expression) is not optimal, but we can write a
+macro that inserts the quote for us:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax tree
+    (syntax-rules ()
+      [(tree datum)
+       (make-tree 'datum)]))
+#+END_SRC
+
+With this macro, we can now build our tree with the following syntax:
+
+#+BEGIN_SRC scheme :results silent
+  (define t
+    (tree
+     (((4)
+        2
+        (1))
+       8
+       (-1))))
+#+END_SRC
+
+While this is optimal as far as the flexibility in syntax is
+concerned, the solution is inferior to our original approach of
+building the tree by calling the constructors ~make-node~ and
+~make-leaf~ by hand.  The point is that the procedure ~make-tree~,
+which is called in the output of the macro ~tree~, walks the tree
+expression at run time and so is not as efficient as the original
+approach.  What we want is that the tree expression is analyzed during
+compile time.  As macros are nothing but small compilers, it is no
+surprise that a macro will help.  All we have to do is to rewrite the
+~tree~ macro that it doesn't output a call to ~make-tree~ but that it
+directly outputs calls to ~make-node~ and ~make-leaf~:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax tree
+    (syntax-rules ()
+      [(tree (left value right))
+       (make-node (tree left) value (tree right))]
+      [(tree (value))
+       (make-leaf value)]))
+#+END_SRC
+
+The tree can be built as before:
+
+#+BEGIN_SRC scheme :results silent
+  (define t
+    (tree
+     (((4)
+        2
+        (1))
+       8
+       (-1))))
+#+END_SRC
+
+Now let us do something with the tree.  For example, we can ask for
+the sum of all values in the tree nodes, internal and leaf nodes:
+
+#+BEGIN_SRC scheme :results silent
+  (define tree-accumulate
+     (lambda (t)
+       (cond
+        [(node? t)
+         (+ (tree-accumulate (node-left t))
+            (node-value t)
+            (tree-accumulate (node-right t)))]
+        [(leaf? t)
+         (leaf-value t)]
+        [else (assert #f)])))
+#+END_SRC
+
+We can test the procedure with our example tree:
+
+#+BEGIN_SRC scheme :results value :export both :wrap example
+  (tree-accumulate t)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+14
+#+end_example
+
+We have used Scheme's general ~cond~ expression to dispatch on the two
+possible types of trees.  Compared to pattern matchers of other
+languages, this also does not deserve the attribute neat.  What we
+would like is to have a syntax so that we can write ~tree-accumulate~
+as follows:
+
+#+BEGIN_SRC scheme :eval no
+  (define tree-accumulate
+    (lambda (t)
+      (tree-case t
+       [(node left value right)
+        (+ (tree-accumulate left)
+           value
+           (tree-accumulate right))]
+       [(leaf value)
+        value])))
+#+END_SRC
+
+Obviously, this calls for another macro!
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax tree-case
+    (lambda (stx)
+      (define parse-clause
+        (lambda (cl)
+          (syntax-case cl (node leaf)
+            [[(node left value right) e1 ... e2]
+             #'[(node? tmp)
+                (let ([left (node-left tmp)]
+                      [value (node-value tmp)]
+                      [right (node-right tmp)])
+                  e1 ... e2)]]
+            [[(leaf value) e1 ... e2]
+             #'[(leaf? tmp)
+                (let ([value (leaf-value tmp)])
+                  e1 ... e2)]]
+            [_
+             (syntax-violation 'tree-case "invalid clause syntax" stx cl)])))
+      (syntax-case stx ()
+        [(_ tree-expr clause ...)
+         (with-syntax ([(clause ...)
+                        (map parse-clause #'(clause ...))])
+           #'(let ([tmp tree-expr])
+               (unless (tree? tmp)
+                 (assertion-violation 'tree-case "invalid tree argument" tmp))
+               (cond
+                clause ...
+                [else
+                 (assertion-violation 'tree-case "unhandled tree argument" tmp)])))]
+        [_
+         (syntax-violation 'tree-case "invalid syntax" stx)])))
+
+  (define tree?
+    (lambda (obj)
+      (or (node? obj)
+          (leaf? obj))))
+#+END_SRC
+
+In the above macro, we used the procedure ~syntax-violation~ defined
+by Scheme to report syntax errors when the macro is misused.  It is
+always a good idea to report syntax violations as early and as precise
+as possible.
+
+The two identifiers, the Scheme reports speak of /auxiliary syntax/,
+~node~ and ~leaf~ are matched using ~free-identifier=?~.  Both of
+these identifiers are bound (they were bound by our record-type
+definitions of the ~node~ and the ~leaf~ type).  Thus, when the macro is used in the form
+#+BEGIN_SRC :scheme :eval no
+  (tree-case t
+   [(n l v r) ---]
+   ---)
+#+END_SRC
+the binding of the identifier ~n~ is compared to the binding of the
+identifier ~node~ (in the lexical context of the macro transformer).
+
+In general, it is a good idea to use bound identifiers as literals in
+~syntax-case~ (or ~syntax-rules~).  Even if the code surrounding a
+macro use of, say, ~tree-case~ binds ~node~ to something else, the
+library system of Scheme allows to import another identifier that is
+bound to the original binding of ~node~ so the ~tree-case~ macro can
+still be used with the other identifier in place.  This does not work
+when ~free-identifier=?~ compares unbound identifiers by name.
+
+With our ~tree-case~ macro, we can finally define and test our newly
+written ~tree-accumulate~:
+
+#+BEGIN_SRC scheme :results value :exports both :wrap example
+  (define tree-accumulate
+    (lambda (t)
+      (tree-case t
+       [(node left value right)
+        (+ (tree-accumulate left)
+           value
+           (tree-accumulate right))]
+       [(leaf value)
+        value])))
+
+  (tree-accumulate t)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+14
+#+end_example
+
+We have solved our binary-tree-use case but we can still do better.
+Assume that the problem we have to solve the next day does not involve
+binary trees but abstract syntax trees of a programming language, for
+which we have to write an interpreter or compiler.  Instead of
+(internal) nodes and leaves, we would have, say, expressions,
+statements, definitions, programs.  When walking an abstract syntax
+tree, one has to dispatch again on the possible types of an abstract
+syntax tree.  So, instead of ~tree-case~ we want ~ast-case~.  We could
+copy and suitably modify the ~tree-case~ macro but this would violate
+DRY.
+
+The answer is, instead, to write a macro, once and for all, that
+generates macros like ~tree-case~.  Here it is:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax define-destructor
+    (lambda (stx)
+      (syntax-case stx ()
+        [(_ name [keyword predicate-expr accessor-expr ...] ...)
+         (for-all identifier? #'(keyword ...))
+         (with-syntax
+             ([(pred-id ...)
+               (generate-temporaries #'(predicate-expr ...))]
+              [((acc-id ...) ...)
+               (map generate-temporaries #'((accessor-expr ...) ...))]
+              [((var ...) ...)
+               (map generate-temporaries #'((accessor-expr ...) ...))])
+           #'(begin
+               (define pred-id predicate-expr) ...
+               (define acc-id accessor-expr) ... ...
+               (define-syntax name
+                 (lambda (stx)
+                   (define parse-clause
+                     (lambda (cl)
+                       (syntax-case cl (keyword ...)
+                         [[(keyword var ...) e1 (... ...) e2]
+                          #'[(pred-id tmp)
+                             (let ([var (acc-id tmp)] ...)
+                               e1 (... ...) e2)]]
+                         ...
+                         [_
+                          (syntax-violation 'name "invalid clause syntax" stx cl)])))
+                   (syntax-case stx ()
+                     [(_ expr clause (... ...))
+                      (with-syntax ([(clause (... ...))
+                                     (map parse-clause #'(clause (... ...)))])
+                        #'(let ([tmp expr])
+                            (cond
+                             clause (... ...)
+                             [else
+                              (assertion-violation 'name "unhandled argument" tmp)])))]
+                     [_
+                      (syntax-violation 'name "invalid syntax" stx)])))))]
+        [_
+         (syntax-violation 'define-destructor "invalid syntax" stx)])))
+#+END_SRC
+
+A few explanations are in order.  First of all, we see nested ellipses
+in the code above.  Using ~syntax-case~ we can match a syntax object
+of the form ~((a b c) (1 2))~ against a pattern of the form ~((x ...)
+...)~.  The pattern variable ~x~ will then represent a list of two
+lists; the first list will contain the elements ~a~, ~b~, and ~c~, the
+second list will contain the elements ~1~ and ~2~.  In ~syntax~
+templates, the pattern variable can be used as long as least two
+ellipses follow.  For example, the template ~((x ...) ...)~ gives back
+~((a b c) (1 2))~, while ~(x ... ...)~ gives ~(a b c 1 2)~.
+
+We also have to explain the occurrences of ~(... ...)~.  In the
+definition of ~define-destructor~, the outer syntax form has to
+evaluate into a syntax object that contains ellipses, so we have to
+keep the outer syntax form from interpreting these ellipses that
+should be in the output syntax object, in other words, we have to
+escape them.  The Scheme way of doing this, is to write ~(... x)~.  If
+~syntax~ sees a sub-template like this one, it processes ~x~ and
+returns the result but gives the ellipsis in ~x~ the status of an
+ordinary identifier.
+
+Coming back to our tree example, the ~define-destructor~ syntax can be
+used as follows:
+
+#+BEGIN_SRC scheme :results silent
+  (define-destructor tree-case
+    [node node? node-left node-value node-right]
+    [leaf leaf? leaf-value])
+#+END_SRC
+
+Now we can redefine ~tree-accumulate~ and test it:
+
+#+BEGIN_SRC scheme :results value :exports both :wrap example
+  (define tree-accumulate
+    (lambda (t)
+      (tree-case t
+       [(node left value right)
+        (+ (tree-accumulate left)
+           value
+           (tree-accumulate right))]
+       [(leaf value)
+        value])))
+
+  (tree-accumulate t)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+14
+#+end_example
+
+* Breaking hygiene
+
+Scheme macros written with ~syntax-rules~ are hygienic.  This is also
+true by default for macros written with the more general
+~syntax-case~/~syntax~ combination.  Hygiene --- although it may take
+some time to understand --- is one of the selling points of Scheme
+macros and one (of many) reasons why Scheme macros are so more
+powerful than, say, macros in C or even in Common Lisp.
+
+Sometimes, however, we want to break hygiene explicitely.  We give a
+number of concrete examples:
+
+** A classical loop macro
+
+A classical example for this is a ~loop~ macro that provides a loop
+that evaluates the code enclosed in it repeatedly until a
+corresponding ~break~ command is evaluated.  A typical use looks like
+the following (again, not necessarily a good example for functional
+programming!):
+
+#+BEGIN_SRC scheme :eval no
+  (let ([i 0])
+    (loop
+      (when (= i 5)
+        (break))
+      (display i)
+      (newline)
+      (incr! i)))
+#+END_SRC
+
+Our first attempt to implement the ~loop~ construct with a macro is
+the following syntax definition:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax loop
+    (lambda (stx)
+      (syntax-case stx ()
+        [(_ e ...)
+         #'(call-with-current-continuation
+            (lambda (break)
+              (let f ()
+                e ...
+                (f))))])))
+#+END_SRC
+
+Here we make use of the fact that Scheme has first-class
+continuations.  The call to ~call-with-current-continuation~ captures
+the continuation of the named ~let~ expression.
+
+Nevertheless, our example code that is supposed to print the numbers
+zero to four won't work with this version of the ~loop~ keyword.  Our
+Scheme system will tell us that ~break~ is an undefined identifier (or
+refer to a predefined top-level identifier with this name).  Although,
+it won't say that, but hygiene is to be blamed for it.
+
+As the identifier ~break~ bound in the output of ~loop~ does not
+come from the input of the ~loop~ form, it has a different history
+than the identifier ~break~ appearing in the body of the loop form.
+Identifiers with different histories do not shadow each other, so the
+~break~ in the loop body cannot reference the binding of ~break~
+coming from the template in the ~loop~ macro.
+
+One way to solve it is to provide ~break~ as an explicit argument to
+the loop macro (we put a star to the name to mark the new syntax):
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax loop*
+    (lambda (stx)
+      (syntax-case stx ()
+        [(_ break e ...)
+         #'(call-with-current-continuation
+            (lambda (break)
+              (let f ()
+                e ...
+                (f))))])))
+#+END_SRC
+
+With this modification, everything works:
+
+#+BEGIN_SRC scheme :results output :export both :wrap example
+  (let ([i 0])
+    (loop* break
+      (when (= i 5)
+        (break))
+      (display i)
+      (newline)
+      (incr! i)))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+0
+1
+2
+3
+4
+#+end_example
+
+This solution has one more advantage besides that it actually works
+--- it allows us to specify the name we want to use for the expression
+breaking out of the loop.  For example, it allows us to easily nest two of
+the loops:
+
+#+BEGIN_SRC scheme :results output :export both :wrap example
+  (let ([i 0])
+    (loop* break-outer
+      (loop* break-inner
+        (when (= i 5)
+          (break-outer))
+        (when (= i 2)
+          (break-inner))
+        (display i)
+        (newline)
+        (incr! i))
+      (display "-\n")
+      (incr! i)))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+0
+1
+-
+3
+4
+#+end_example
+
+(Note how hygiene again helps to make this possible.  Both macro
+instances bind the identifier ~f~, but the occurrences of ~f~
+correspond to different histories so they don't shadow each other.)
+
+While the version with an explicit ~break~ argument to the ~loop*~
+macro has its advantages, sometimes we still may want the more terse
+syntax with an implicit ~break~ parameter.  To make our original
+version of ~loop~ work, we must not introduce a ~break~ identifier
+with a different history.  Instead, we must output ~break~ as if it
+appeared as an argument to the macro use.  In other words, we have to
+forge an identifier and ~datum->syntax~ was the tool to do this:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax loop
+    (lambda (stx)
+      (syntax-case stx ()
+        [(k e ...)
+         (with-syntax ([break (datum->syntax #'k 'break)])
+           #'(call-with-current-continuation
+              (lambda (break)
+                (let f ()
+                  e ...
+                  (f)))))])))
+#+END_SRC
+
+Here, for the first time, we make use of the keyword identifier of the
+macro use, which we bound to the pattern variable ~k~.  The call to
+~datum->syntax~ then returns an identifier named ~break~ as if it
+appears where the macro use keyword appears, that is with the same
+history and the same lexical context.
+
+Let us test our example with this new version!
+
+#+BEGIN_SRC scheme :results output :export both :wrap example
+  (let ([i 0])
+    (loop
+      (when (= i 5)
+        (break))
+      (display i)
+      (newline)
+      (incr! i)))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+0
+1
+2
+3
+4
+#+end_example
+
+** Convenience syntax to bind implicit identifiers
+
+Above, we used the ~datum->syntax~ procedure together with
+~with-syntax~ explicitly to inject an identifier as if it appeared at
+the macro use site into the template.  Chez Scheme provides a
+syntactic form ~with-implicit~ that abstracts from this low-level
+approach.  While the ~with-implicit~ form is non-standard, thanks to
+Scheme's macro system we can define it in any standard system:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax with-implicit
+    (lambda (x)
+      (syntax-case x ()
+        [(_ (k x ...) e1 ... e2)
+         (for-all identifier? #'(k x ...))
+         #'(with-syntax ([x (datum->syntax #'k 'x)] ...)
+             e1 ... e2)]
+        [_
+         (syntax-violation 'with-implicit "invalid syntax" x)])))
+#+END_SRC
+
+With it, we can rewrite our ~loop~ macro as follows:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax loop
+    (lambda (stx)
+      (syntax-case stx ()
+        [(k e ...)
+         (with-implicit (k break)
+           #'(call-with-current-continuation
+              (lambda (break)
+                (let f ()
+                  e ...
+                  (f)))))])))
+#+END_SRC
+
+** Definitions that make the bound name accessible
+
+For those who didn't like the ~loop~ example because it is mostly
+useful in imperative programming, we have provided another example,
+that we will describe in this subsection.
+
+User-friendly procedures check their arguments so that errors are
+reported early:
+
+#+BEGIN_SRC scheme :results silent
+  (define reverse-append
+    (lambda (head tail)
+      (unless (list? head)
+        (assertion-violation 'reverse-append "invalid list argument" head))
+      (let f ([head head] [tail tail])
+        (cond
+         [(null? head) tail]
+         [(pair? head)
+          (f (cdr head) (cons (car head) tail))]
+         [else
+          (assertion-violation 'reverse-append "concurrent modification detected")]))))
+#+END_SRC
+
+Just a brief test:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (reverse-append '(1 2 3) '(4 5 6))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(3 2 1 4 5 6)
+#+end_example
+
+The Scheme procedure that is used here to report an error is
+~assertion-violation~.  Its first formal argument is called ~who~ and
+(if not ~#f~) should be a string or symbol naming the procedure where
+the error occurs.
+
+One can make the point that the code above again violates some
+instance of the DRY principle because we had to type the name of the
+procedure, ~reverse-append~ in this case, three times.  The following,
+non-hygienic, macro, which can also be found in the source code of
+Chez Scheme and in one of Racket's libraries, helps:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax define/who
+    (lambda (x)
+      (define out
+        (lambda (k f e)
+          (with-syntax ([k k] [f f] [e e])
+            (with-implicit (k who)
+              #'(define f
+                  (let ((who 'f)) e))))))
+      (syntax-case x ()
+        [(k (f . u) e1 ... e2)
+         (identifier? #'f)
+         (out #'k #'f #'(lambda u e1 ... e2))]
+        [(k f e)
+         (identifier? #'f)
+         (out #'k #'f #'e)]
+        [_
+         (syntax-violation 'define/who "invalid syntax" x)])))
+#+END_SRC
+
+With ~define/who~ we can define a variable (or procedure) as with
+~define~.  Moreover, the identifier ~who~ (with a lexical and historic
+context as the keyword ~define/who~ in the macro use) is bound to the
+name of the variable (or procedure) being defined.
+
+With ~define/who~, the definition of ~reverse-append~ looks like:
+
+#+BEGIN_SRC scheme :results silent
+  (define/who reverse-append
+    (lambda (head tail)
+      (unless (list? head)
+        (assertion-violation 'who "invalid list argument" head))
+      (let f ([head head] [tail tail])
+        (cond
+         [(null? head) tail]
+         [(pair? head)
+          (f (cdr head) (cons (car head) tail))]
+         [else
+          (assertion-violation 'who "concurrent modification detected")]))))
+#+END_SRC
+
+We can compare ~who~ with the predefined identifier ~__func__~ that
+can be found in the C99 standard.  With Scheme and its macro system,
+however, this becomes a library feature and need not be a language
+feature.
+
+** Definitions of constants
+
+In Scheme, we can use ~define~ to, well, define a variable.  This
+variable can be ~set!~ by other parts of the code, possibly
+accidentally.  So we may want to define a variable-like object that
+behaves more like a constant.  One option is to use the
+~identifier-syntax~ form, we already saw at the beginning of the
+tutorial:
+
+#+BEGIN_SRC scheme :results value :exports both :wrap example
+  (define-syntax pi (identifier-syntax 3.14159))
+  pi
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+3.14159
+#+end_example
+
+If we tried to mutate the "variable" ~pi~ now, the Scheme system would
+raise an exception.
+
+This is a good point to give the actual definition of
+~identifier-syntax~.  Like ~syntax-rules~, it can be defined by the
+more primitive forms ~syntax-case~ and ~syntax~:
+
+#+BEGIN_SRC scheme :eval no
+  (define-syntax identifier-syntax
+    (syntax-rules (set!)
+      [(_ e)
+       (lambda (x)
+         (syntax-case x ()
+           [id (identifier? #’id) #’e]
+           [(_ x (... ...)) #’(e x (... ...))]))]
+      [(_ (id exp1) ((set! var val) exp2))
+       (and (identifier? #’id) (identifier? #’var))
+       (make-variable-transformer
+        (lambda (x)
+          (syntax-case x (set!)
+            [(set! var val) #’exp2]
+            [(id x (... ...)) #’(exp1 x (... ...))]
+            [id (identifier? #’id) #’exp1])))]))
+#+END_SRC
+
+This definition can be found exactly in this form in the R6RS,
+describing the Scheme language and its standard libraries.  Again, we
+see the occurrence of the quoted ellipses ~(... ...)~, which is
+necessary because of the nesting of templates (remember that the right
+hand side of ~syntax-rules~ rules are ~syntax~ templates).
+
+We also note the two patterns within the first ~syntax-case~.  The
+first pattern is of the form ~id~ where ~id~ is an identifier, the
+second pattern is of the form ~(_ x ...)~ where ~x~ is an arbitrary
+form.  The first pattern will match if the identifier, ~pi~ in our
+example, is not used in head-position of a combination; the second
+pattern will match if ~pi~ is used in the form ~(pi x ...)~.  The
+latter does not make sense for ~pi~, but we see that
+~identifier-syntax~ allows us to define procedure-like identifiers
+that behave differently when the directly applied or when referenced.
+
+In the second part of the definition of ~identifier-syntax~, the
+procedure ~make-variable-transformer~ is used.  This turns a macro
+transformer given by a procedure (mapping syntax objects to syntax
+objects) into a /variable-transformer/.  A variable-transformer does
+the same mapping between syntax objects but will also be called by the
+expander when it processes an expression of the form ~(set! id form)~
+where ~id~ is the keyword bound to a variable-transformer.
+
+Now, 3.14159 is not the most precise value of ~pi~.  We get a value
+whose precision is adapted to the precision of Schemes inexact real
+numbers by using the formula ~(* 2 (atan 1 0))~.  This directly leads to the
+following attempt of redefining ~pi~:
+
+#+BEGIN_SRC scheme :results value :exports both :wrap example
+  (define-syntax pi (identifier-syntax (* 2 (atan 1 0))))
+  pi
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+3.141592653589793
+#+end_example
+
+This is not a good solution, though.  Every time, we reference ~pi~,
+Scheme replaces it by the expression ~(* 2 (atan 1 0))~, so unless we
+can rely on a sufficiently optimizing compiler, we will have ~pi~
+recalculated every time we use it.  A better approach is to calculate
+the value once, store this is a variable and expand into a reference
+to it:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax define-constant
+    (lambda (stx)
+      (syntax-case stx ()
+        [(_ id expr)
+         (identifier? #'id)
+         #'(begin
+             (define val expr)
+             (define-syntax id (identifier-syntax val)))])))
+#+END_SRC
+
+Again, we have macro-defining macro.  Thanks to hygiene, the variable
+~val~ cannot be accessed outside the macro.  Let's test our new macro:
+
+#+BEGIN_SRC scheme :results value :exports both :wrap example
+  (define-constant pi (* 2 (atan 1 0)))
+  pi
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+3.141592653589793
+#+end_example
+
+The number ~pi~ is just a single constant, so let us now turn to a use
+case where not only more than one constant but many constants are
+needed.  For concreteness, let us assume that want to develop a
+library handling ELF files.  We could start with defining all the
+magic constants:
+
+#+BEGIN_SRC scheme :eval no
+  (define-constant et-none #x00)
+  (define-constant et-rel  #x01)
+  (define-constant et-exec #x02)
+  ...
+  (define-constant pt-null #x00000000)
+  (define-constant pt-load #x00000001)
+  ...
+#+END_SRC
+
+This is not much different from what we would do in C.  However, it
+has the same problem.  It pollutes our top-level namespace.  In
+Scheme, this is mitigated a bit due to the library system (which
+allows one to confine these constants in a module); nevertheless a
+library that exports myriads of identifiers (and where the exact set
+of identifiers may depend on the version of the ELF format) is not a
+good idea.
+
+A way out is --- you will already have guessed it --- the Scheme macro
+system.  We will implement a macro ~define-constants~ that can be used
+as follows:
+
+#+BEGIN_SRC scheme :eval no
+  (define-constants elf-constant
+    (et-none #x00)
+    (et-rel  #x01)
+    ...)
+
+  (elf-constant et-none) ; => 0x01
+#+END_SRC
+
+Moreover, we want this definition to bind the identifier
+~elf-constants~ (note the "s") to a procedure returning an association
+list of the form
+
+#+BEGIN_SRC scheme :eval no
+  ((et-none . #x00)
+   (et-rel  . #x01)
+   ...)
+#+END_SRC
+
+For this, we first need a procedure that takes an identifier like
+~elf-constant~ and constructs a new identifier, ~elf-constants~ in
+this case, from it:
+
+#+BEGIN_SRC scheme :results silent
+  (define/who construct-name
+    (lambda (k . arg*)
+      (unless (identifier? k)
+        (assertion-violation who "invalid template identifier argument" k))
+      (datum->syntax
+       k
+       (string->symbol
+        (apply string-append
+               (map (lambda (x)
+                      (cond
+                       [(string? x)
+                        x]
+                       [(identifier? x)
+                        (symbol->string (syntax->datum x))]
+                       [else
+                        (assertion-violation who "invalid string or identifier argument" x)]))
+                    arg*))))))
+#+END_SRC
+
+This procedure takes a template identifier ~k~ and a sequence of
+strings and identifiers to forge and return an identifier with the
+same lexical and historic context as ~k~ and whose name is given by
+the concatenation of the sequence of strings and identifier (names).
+
+With it, we can define our ~define-constants~ easily:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax define-constants
+    (lambda (x)
+      (syntax-case x ()
+        [(_ t (n c) ...)
+         (and (identifier? #'t)
+              (for-all identifier? #'(n ...)))
+         (with-syntax ([ts (construct-name #'t #'t "s")]
+                       [(e ...) (generate-temporaries #'(c ...))])
+           #'(begin
+               (define e c)
+               ...
+               (define-syntax t
+                 (lambda (x)
+                   (syntax-case x ()
+                     [(_ y)
+                      (identifier? #'y)
+                      (cond
+                       [(assq (syntax->datum #'y) (list (cons 'n #'e) ...)) => cdr]
+                       [else
+                        (syntax-violation 't "unknown constant" x #'y)])]
+                     [_
+                      (syntax-violation 't "invalid syntax" x)])))
+               (define ts
+                 (lambda ()
+                   '([n . c] ...)))))])))
+#+END_SRC
+
+The macro is programmed so that the lookup of the constant happens at
+expand-time and not at run-time.  Let us test it:
+
+#+BEGIN_SRC scheme :results value :exports both :wrap example
+  (define-constants color
+    (salmon          #xFA8072)
+    (light-green     #x90EE90)
+    (cornflower-blue #x6495ED))
+
+  (colors)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+((salmon . 16416882) (light-green . 9498256) (cornflower-blue . 6591981))
+#+end_example
+
+#+BEGIN_SRC scheme :results value :exports both :wrap example
+  (color cornflower-blue)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+6591981
+#+end_example
+
+** A pitfall
+
+Although the macros ~loop~ and ~define/who~ defined above are
+non-hygienic, they are only so in a controlled sense.  They behave as
+if the user has provided an explicit ~break~ or ~who~ identifier, so
+do not really differ from a hygienic macro, which makes reasoning
+about them still easy.
+
+Nevertheless, there is still a potential pitfall, we are going to
+explain now.  Consider the following definition of the macro
+~define-logging/who~:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax define-logging/who
+    (syntax-rules ()
+      [(define-logging/who (name . formals) body1 ... body2)
+       (define/who (name . formals)
+         (display "log: entering procedure ")
+         (display who)
+         (newline)
+         body1 ... body2)]))
+#+END_SRC
+
+The macro defines a "logging procedure", a procedure that prints a log
+message when it is called:
+
+#+BEGIN_SRC scheme :results output :exports both :wrap example
+  (define-logging/who (hello)
+    (display "Hello!\n"))
+  (hello)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+log: entering procedure hello
+Hello!
+#+end_example
+
+The ~define-logging/who~ macro's output is an instance of the
+~define/who~ macro from earlier.  The ~define-logging/who~ macro makes
+use of the implicitly defined ~who~ identifier.
+
+We named the macro ~define-logging/who~ with the suffix ~/who~ because
+the idea is that the user of the ~define-logging/who~ macro can also
+refer to the procedure's name through the implicitly bound identifier
+~who~.  This, however, is not the case as the following test shows:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (let ([who 'outer])
+    (define-logging/who (return-who)
+      who)
+    (return-who))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+outer
+#+end_example
+
+The reason is that historic context of the identifier ~who~ is the
+same as the historic context of the identifier ~define/who~ that
+occurs in the syntax template in the definition of
+~define-logging/who~.  The historic context of the identifier
+~define/who~, which does not come from the macro input in the use of
+~define-logging/who~, is therefore not the same as those of the
+identifiers ~who~ appearing in the source of our test.
+
+This problem cannot be easily mitigated bar explicitly define ~who~ a
+second time with the historic context of the final macro use.  One
+could think a possible solution would be the following rewrite:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax define-logging/who
+    (lambda (stx)
+      (syntax-case stx ()
+        [(k (name . formals) body1 ... body2)
+         (with-implicit (k define/who who)
+           #'(define/who (name . formals)
+               (display "log: entering procedure ")
+               (display who)
+               (newline)
+               body1 ... body2))])))
+#+END_SRC
+
+Here, the identifier ~define/who~ is put in the macro output of
+~define-logging/who~ with the same history as the keyword in the macro
+use of ~define-logging/who~.  This will create ~who~ with the historic
+context of the macro use of ~define-logging/who~ (and that's why we
+had to add ~who~ to the list of implicit identifiers as well), but it
+will only work if ~define/who~ is also bound (to the correct macro) at
+the use site of the macro ~define-logging/who~.  Such an assumption,
+however, should not be made.  (In the section after next we are going
+to finally give a solution that works, but it needs an extension which
+is not in R6RS.)
+
+Our other example for a macro with implicit (unhygienic) identifiers
+was ~define-constant~ where the plural form of the name of the defined
+macro was a forged identifier.  That identifier's history, however,
+was not derived from the macro keyword in the macro use but from the
+(singular) name of the defined macro.  This also helps mitigating the
+problem of nested macro invocations described above.
+
+* Phasing
+
+Phasing is an issue that is not specific to the particular macro
+system of Scheme or hygienic macros but occurs with procedural macros
+when the system distinguishes between run-time and expand-time.  The
+latter distinction is important, for example, for the possibility of
+ahead-of-time compilation.  As Scheme allows to evaluate code at run
+time, which then has to be expanded first, run-time and expand-time
+can be interleaved.  The latter can also be due to the library system
+of Scheme; a library may need to be run first before another library
+can be expanded because the macro transformers may reference the code
+of the first library.
+
+** (Relative) phases
+
+When the expressions in a program or library are evaluated, the
+evaluation happens at a specific /relative phase/.  These relative
+phases are non-negative integers.  The top-level expressions are
+evaluated at relative phase 0.  The right-hand sides of top-level
+variable definitions are also evaluated at relative phase 0.  The
+right-hand sides of top-level syntax definitions are evaluated at
+relative phase 1 (which means: "earlier").  The right-hand side of a
+variable definition appearing within an expression evaluated at
+relative phase /n/ is also evaluated at relative phase /n/.  The
+right-hand side of a syntax definition appearing within an expression
+evaluated at relative phase /n/ is evaluated at relative /n/ + 1.
+
+In other words, /define-syntax/ shifts the phase by one for its
+right-hand side.
+
+The following code should make this clearer:
+
+#+BEGIN_SRC scheme :eval no
+  (begin
+    (define x 4)
+    (define-syntax foo
+      (lambda (stx)
+        (define-syntax bar
+          (lambda (stx)
+            #'3))
+        (+ 1 bar)))
+    (+ x foo))
+#+END_SRC
+
+Assume that this expression is evaluated at phase /n/ (0 if appearing
+at the program top-level).  The right-hand side of the definition of
+~x~, the reference to ~x~ and the use of the macro ~foo~ are evaluated
+at relative phase /n/.  The transformer expression of ~foo~ is
+evaluated at relative phases /n/ + 1, and the transformer expression
+of ~bar~ is evaluated at relative phase /n/ + 2.
+
+** Identifier references at different phases
+
+A variable (an identifier bound to a location holding a value) can be
+referenced by an expression if the expression is evaluated at the same
+relative phase as the initializing expression of the variable.  A
+keyword (an identifier bound to a macro transformer) can be referenced
+by an expression if the expression is evaluated at the same or higher
+relative phase than the phase of the transformer expression of the
+keyword minus one.
+
+The following code is erroneous, for example:
+
+#+BEGIN_SRC scheme :eval no
+  (let ([counter 0])
+    (define-syntax count!
+      (lambda (stx)
+        (syntax-case stx ()
+          [(_)
+           (begin
+             (set! counter (+ 1 counter))
+             #'(values))])))
+    (count!)
+    counter)
+#+END_SRC
+
+The variable ~counter~ can only be referenced at relative phase 0,
+thus not in the right-hand side of the syntax definition of ~count!~,
+which is evaluated at relative phase 1.  One can understand this
+restriction as follows: The variable ~counter~ only exists at
+run-time, not at compile-time of the program, but the transformer
+associated to ~count!~ us used at compile-time.
+
+On the other hand, the following example is correct code:
+
+#+BEGIN_SRC scheme :results value :export both :wrap example
+  (let-syntax ([foo (lambda (stx) #'1)])
+    (define-syntax bar
+      (lambda (stx)
+        (define-syntax quux
+          (lambda (stx)
+            foo))
+        quux))
+    bar)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+1
+#+end_example
+
+If a procedure needs to be used in different phases, in Scheme the
+library system can be used.  If a library exports a variable (bound to
+the procedure) or any other identifier, the identifier can be imported
+at any relative phase.
+
+* Extensions
+
+In this section, we will describe three extensions to Scheme macro's
+system that are not yet standardized in one the reports.  All three
+extensions are supported by Chez Scheme, so we can experiment with
+them.
+
+** Aliases
+
+Given an identifier ~x~, we may want to use it under a different name
+as well.  The first attempt of defining an alias for ~x~ may look
+like:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (let ([x 'old])
+    (define-syntax y
+      (identifier-syntax
+       [_ x]
+       [(set! _ e) (set! x e)]))
+    (set! y 'new)
+    x)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+new
+#+end_example
+
+This solution has no run-time overhead because ~y~ is a keyword and
+not a variable.  Whenever we access ~y~, Scheme's expander rewrites it
+into an access of ~x~.  In a lot of cases, this is all that we need.
+Still, ~y~ is not a true alias to ~x~.  This is demonstrated by the
+following test:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (let ([x 'old])
+    (define-syntax y
+      (identifier-syntax
+       [_ x]
+       [(set! _ e) (set! x e)]))
+    (free-identifier=? #'x #'y))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+#f
+#+end_example
+
+The reason that the result of the ~free-identifier=?~ test is ~#f~ is
+that ~x~ and ~y~ are bound differently.  The identifier ~x~ is bound
+to a location holding a value (~x~ is a variable); the identifier ~y~
+is bound to a macro transformer (~y~ is a keyword).
+
+The ~alias~ form described in [[https://srfi.schemers.org/srfi-212/srfi-212.html][SRFI 212]] allows to define true aliases.
+The syntax is ~(alias y x)~, which can be used wherever definitions
+are allowed.  It arranges that ~y~ has the same binding as ~x~:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (let ([x 'old])
+    (alias y x)
+    (set! y 'new)
+    (list (free-identifier=? #'x #'y) x))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(#t new)
+#+end_example
+
+(The reason why ~alias~ is not called ~define-alias~ is that it does
+not define a new binding; it just gives an existing binding (the one
+of ~x~) a new name (~y~).)
+
+With the ~alias~ form, there is also a general solution to the general
+problem of nested unhygienic macros that we exhibited with
+~define-logging/who~:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax define-logging/who
+    (lambda (stx)
+      (syntax-case stx ()
+        [(k (name . formals) body1 ... body2)
+         (with-syntax ([(tmp-id) (generate-temporaries #'(tmp))])
+           (with-syntax ([local-define/who
+                          (construct-name #'k #'tmp-id)])
+             (with-implicit (k who)
+               #'(begin
+                   (alias local-define/who define/who)
+                   (local-define/who (name . formals)
+                     (display "log: entering procedure ")
+                     (display who)
+                     (newline)
+                     body1 ... body2)))))])))
+#+END_SRC
+
+Here, we generate a fresh identifier and construct from its name an
+identifier with the context of the keyword of the use of
+~define-logging/who~.  This identifier is then aliased to ~define/who~
+but is used instead so that the transformer bound to ~define/who~ (and
+now also bound to ~define-logging/who~ forges the ~who~ identifier
+with the right context.
+
+Let us test our new version:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (let ([who 'outer])
+    (define-logging/who (return-who)
+      who)
+    (return-who))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+return-who
+#+end_example
+
+** Syntax parameters
+
+Syntax parameters, which are like aliases also described in a SRFI,
+namely [[https://srfi.schemers.org/srfi-139/srfi-139.html][SRFI 139]], provide an alternative to unhygienic macros when
+implicit macro parameters are needed.[fn:11]
+
+In what follows, we use Chez
+Scheme's implementation so that we can readily test our examples.
+
+Chez Scheme defines the ~fluid-let-syntax~ form, whose syntax is
+equivalent to ~let-syntax~, but which is to ~let-syntax~ as
+~fluid-let~ is to ~let~.  In other words, it rebinds a keyword for the
+dynamic extent of the expansion of the body of ~fluid-let-syntax~:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (let-syntax ([x (identifier-syntax 'outer)])
+    (define-syntax y (identifier-syntax x))
+    (list
+     (fluid-let-syntax ([x (identifier-syntax 'inner)])
+       y)
+     y))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(inner outer)
+#+end_example
+
+Compare this to ~let-syntax~:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (let-syntax ([x (identifier-syntax 'outer)])
+    (define-syntax y (identifier-syntax x))
+    (list
+     (let-syntax ([x (identifier-syntax 'inner)])
+       y)
+     y))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(outer outer)
+#+end_example
+
+With the use of syntax parameters (keywords that are rebound by
+~fluid-let-syntax~), we can give a definition of our ~loop~ macro as a
+hygienic macro:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax break
+    (lambda (stx)
+      (syntax-violation 'break "invalid use outside of loop form" stx)))
+  (define-syntax loop
+    (syntax-rules ()
+      [(loop e ...)
+       (call/cc
+        (lambda (k)
+          (fluid-let-syntax
+              ([break (syntax-rules () [(break) (k)])])
+            (let f ()
+              e ... (f)))))]))
+#+END_SRC
+
+Let us test this new version:
+
+#+BEGIN_SRC scheme :results output :exports both :wrap example
+  (let ([i 0])
+    (loop
+      (when (= i 5)
+        (break))
+      (display i)
+      (newline)
+      (incr! i)))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+0
+1
+2
+3
+4
+#+end_example
+
+In this example, ~datum->syntax~ does not appear so the macro defined
+above is indeed hygienic.  The identifier ~break~ was not newly
+introduced by the macro use but already existed in the lexical context
+of the macro use.
+
+It should be noted that the new ~loop~ macro has a different semantics
+than the unhygienic ~loop~ macro from earlier.  In our original ~loop~
+macro, the expression ~(break)~ ends the loop when ~break~ is
+"~bound-identifier=?~" to the implicit identifier forged by the first
+version of the ~loop~ macro.  In the version with syntax parameters,
+the expression ~(break)~ ends the loop when ~break~ is
+"~free-identifier=?~" to the global identifier named ~break~.  Which
+semantics is the better one depends on the use case.  On the one hand
+side, hygienic macros are preferable to unhygienic ones.  On the other
+hand side, syntax parameters have the same problem associated to
+variables with dynamic scope: Their change of the behavior of code is
+not lexically confined.
+
+The [[https://cisco.github.io/ChezScheme/csug9.5/syntax.html#./syntax:h1][Chez Scheme User's Guide]] contains a very interesting use of syntax
+parameters, which we want to reproduce here:
+
+#+BEGIN_SRC scheme :results silent
+(define-syntax define-integrable
+  (syntax-rules (lambda)
+    [(_ name (lambda formals form1 form2 ...))
+     (begin
+       (define xname
+         (fluid-let-syntax ([name (identifier-syntax xname)])
+           (lambda formals form1 form2 ...)))
+       (define-syntax name
+         (lambda (x)
+           (syntax-case x ()
+             [_ (identifier? x) #'xname]
+             [(_ arg (... ...))
+              #'((fluid-let-syntax ([name (identifier-syntax xname)])
+                   (lambda formals form1 form2 ...))
+                  arg
+                  (... ...))]))))]))
+#+END_SRC
+
+The ~define-integrable~ keyword can be used as follows:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (define-integrable count
+    (lambda (ls)
+      (if (null? ls)
+          0
+          (+ (car ls) (count (cdr ls))))))
+
+  (list (count '(1 2 3))
+        (procedure? count))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(6 #t)
+#+end_example
+
+This definition binds ~count~ to a keyword that behaves like an
+immutable variable bound to a procedure.  However, when ~count~ is
+used in the form ~(count '(1 2 3))~ the procedures body is inlined at
+the macro use site, allowing for more local optimizations.  We chose
+the example of a recursive procedure because it demonstrates a
+difficulty: If ~count~ in the procedure's body were also inlined and
+so on, we would get an infinite macro expansion.  Instead, the
+implementation of ~define-integrable~ uses a syntax parameter to
+rebound ~count~ in the procedure body so that it is not further
+inlined.
+
+** Identifier properties
+
+It is often the case that two different macros have to communicate.
+In its simplest form we already saw it, namely in the case of macros
+whose behavior depends on the presence of auxiliary syntax (another
+macro) in their inputs.  A typical example is Scheme's ~cond~ keyword
+(implementable as a macro in terms of ~if~) that uses the ~else~
+auxiliary syntax.
+
+Such an auxiliary keyword can function as a yes/no flag.  Sometimes,
+however, we may be interested in more than a boolean value.  This can
+be done with identifier properties, which are implemented in Chez
+Scheme and also described in [[https://srfi.schemers.org/srfi-213/srfi-213.html][SRFI 213]].
+
+An identifier property are superficially similar to symbol properties
+of Lisp, but there are important differences making them work with
+Scheme's macro system.  Identifier properties are associated with an
+existing binding of an identifier and thus automatically lexically
+scoped.  Each property is keyed by the binding of another identifier,
+so also property keys are lexically scoped.
+
+The ~define-property~ form, which can be used where ever a definition
+can be used, associates properties with identifiers:
+
+#+BEGIN_SRC scheme :results none
+  (define add1 (lambda (x) (+ 1 x)))
+  (define key)
+  (define-property add1 key #'"value")
+#+END_SRC
+
+If the ~define-property~ appears in a context evaluated at relative
+phase /n/, the very right-hand side of ~define-property~ is evaluated
+at relative phase /n/ + 1, much like the right-hand side of
+~define-syntax~.  This means that the property value, ~"(syntax "value")"~ in
+this example, is accessible at expand-time, but not a run-time.
+
+Regardless of the identifier property attached to ~add1~, the
+identifier is still a variable resolving to a procedure adding one to
+its argument:
+
+#+BEGIN_SRC scheme :results value :exports both :wrap example
+  (add1 2)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+3
+#+end_example
+
+Macro transformers can retrieve the values of identifier properties.
+If the need to do so, they have to return a procedure instead of a
+syntax object.  The returned procedure must accept one argument,
+~lookup~ and should return the syntax object which is the result of
+the transformation.  The ~lookup~ procedure takes two arguments ~id~
+and ~key~, which must be bound identifiers, and returns the value of
+the identifier property associated to ~id~ and keyed by ~key~, or ~#f~
+if there is none:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (let-syntax
+      ([x
+        (lambda (stx)
+          (lambda (lookup)
+            (syntax-case stx ()
+              [(_ key)
+               (or (lookup #'add1 #'key)
+                   #'"no-value")])))])
+    (define other-key)
+    (list (x key) (x other-key)))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+("value" "no-value")
+#+end_example
+
+While this example theoretically describes how identifier properties
+work, it doesn't show their usefulness.  A more practical example is
+given by another loop macro, modeling general ~for~, we are going to
+present:
+
+#+BEGIN_SRC scheme :results silent
+  (define key)
+
+  (define-syntax define-iterator
+    (lambda (stx)
+      (syntax-case stx ()
+        [(define-iterator name parser-expr)
+         (identifier? #'name)
+         #'(begin
+             (define-syntax name
+               (lambda (stx)
+                 (syntax-violation 'name "invalid use of for keyword" stx)))
+             (define-property name key
+               (let ([parser parser-expr])
+                 (unless (procedure? parser)
+                   (assertion-violation 'define-iterator "invalid parser" parser))
+                 parser)))])))
+
+  (define-syntax for
+    (lambda (stx)
+      (lambda (lookup)
+        (define parse-clause
+          (lambda (cl)
+            (syntax-case cl ()
+              [(formals keyword . arg)
+               (identifier? #'keyword)
+               (let ([keyword #'keyword])
+                 (define parser (lookup keyword #'key))
+                 (unless (procedure? parser)
+                   (syntax-violation 'for "invalid for iterator" stx keyword))
+                 (let-values ([(outer-var* var* loop-var*
+                                outer-expr init-expr test-expr loop-expr step-expr)
+                               (parser stx cl)])
+                   (list outer-var* var* loop-var*
+                         outer-expr init-expr test-expr loop-expr step-expr)))])))
+        (syntax-case stx ()
+          [(_ (clause ...) command ...)
+           (with-syntax ([(((outer-var ...) (var ...) (loop-var ...)
+                            outer-expr init-expr test-expr loop-expr step-expr) ...)
+                          (map parse-clause #'(clause ...))])
+             #'(let-values ([(outer-var ...) outer-expr] ...)
+                 (let-values ([(var ...) init-expr] ...)
+                   (let f ([var var] ... ...)
+                     (unless (or test-expr ...)
+                       (let-values ([(loop-var ...) loop-expr] ...)
+                         command ...
+                         (let-values ([(var ...) step-expr] ...)
+                           (f var ... ...))))))))]))))
+
+  (define-iterator in-list
+    (lambda (stx cl)
+      (syntax-case cl ()
+        [(var _ list-expr)
+         (identifier? #'var)
+         (values #'()
+                 #'(tmp)
+                 #'(var)
+                 #'(values)
+                 #'list-expr
+                 #'(null? tmp)
+                 #'(car tmp)
+                 #'(cdr tmp))])))
+
+  (define-iterator in-range
+    (lambda (stx cl)
+      (syntax-case cl ()
+        [(var _ start-expr end-expr)
+         (identifier? #'var)
+         (values #'(end)
+                 #'(i)
+                 #'(var)
+                 #'end-expr
+                 #'start-expr
+                 #'(>= i end)
+                 #'i
+                 #'(+ i 1))])))
+#+END_SRC
+
+The public API for our new loop facility consists of the ~for~ keyword
+and the ~define-iterator~ defining keyword.  Moreover, we defined two
+iterator forms, one for going through a list and the other one for going
+through a numeric range.  The loop facility is extensible because the
+user can define more iterator forms using ~define-iterator~.
+
+A typical use of a ~for~ loop can look like the following:
+
+#+BEGIN_SRC scheme :results output :exports both :wrap example
+  (for ([x in-list '(a b c)]
+        [i in-range 0 10])
+    (display (list x i))
+    (newline))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(a 0)
+(b 1)
+(c 2)
+#+end_example
+
+In a language without a powerful macro system as Scheme possesses it,
+if it doesn't ship a suitable looping construct for our needs, we
+can't do anything except hoping for a future version of the language
+that includes more looping constructs.  In Scheme, on the other hand,
+a small and simple core suffices as we can build syntactic
+abstractions as much as we can build procedural abstractions
+ourselves.  Many advertised "brand new" features of en-vogue or
+not-so-en-vogue languages may sound like a big yawn to a Schemer.
+
+In our implementation of the ~for~ macro above, we used identifier
+properties on the iterator keywords to communicate with the main ~for~
+macro.  This hints at how we can build powerful, extensible
+sub-languages into Scheme.
+
+* Complex examples
+
+** TODO An LR(1) parser generator implemented as a Scheme macro
+
+* Exercises
+
+1. Write a macro ~push!~ such that ~(push! list-variable expression)~
+   prepends the value of ~expression~ to the list bound to the
+   ~list-variable~.
+
+2. Write a macro ~when-all~ such that ~(when-all test-expression
+   ... expression)~ evaluates ~expression~ only if all
+   ~test-expressions~ evaluate to ~#f~.  The macro should
+   short-circuit the evaluation the ~test-expressions~ as soon as one
+   evaluates to ~#f~.
+
+3. Write a macro ~alist~ such that ~(alist key1 value key2 value2
+   ... )~ expands into a literal expression of the form ~'((key1
+   value1) (key2 value2) ...)~.
+
+4. Write a macro ~timestamp~ such that ~timestamp~ expands into a
+   number literal counting the number of uses of ~timestamp~.
+
+5. Rewrite ~fluid-let~ as a recursive macro that does not use
+   ~generate-temporaries~.
+
+6. Write a procedure ~symbolic-identifier=?~ so that
+   ~(symbolic-identifier=? id1 id2)~ returns ~#t~ if and only if the
+   two identifiers ~id1~ and ~id2~ have the same symbolic name.
+
+7. Extend the ~loop~ macro so that evaluating ~(continue)~ skips the
+   rest of the current loop iteration and the loop continues with the
+   next iteration.
+
+8. Modify the ~for~ macro into a functional form supporting
+   user-definable accumulators whose final result are returned by the
+   ~for~ expression.
+
+9. Write a pattern matching Scheme macro.
+
+10. Write a version of the lex scanner generator as a Scheme macro.
+
+* Footnotes
+[fn:11]In-depth advanced information can be found in the paper [[http://scheme2011.ucombinator.org/papers/Barzilay2011.pdf][Keeping
+it Clean with Syntax Parameters]].
+
+[fn:10]Remember that Scheme has first-class continuation.  But this is
+a topic for a different tutorial.
+
+[fn:9]In fact, the standard binding constructs in Scheme ~let~,
+~let*~, or ~letrec~ can also be defined as macro keywords in terms of
+the more primitive ~lambda~ using the macro facility described in this
+report.
+
+[fn:8]When used in programs or libraries, there is one problem in the
+first approach because of so-called phasing issues.  We will come back
+to this.
+
+[fn:7]The term "history" of an identifier is not an established one
+but was invented for this presentation.
+
+[fn:6]Note that this cannot be done with C preprocessor macros.
+
+[fn:5]Such a form is predefined in Chez Scheme, but is not part of the
+Scheme standard.  In fact, Chez Scheme's version properly handles tail
+calls, which our simple version doesn't.
+
+[fn:4]While Scheme does not forbid mutation (like ML but unlike
+Haskell), the pitfalls of impure code are well-understood.  Therefore,
+the names of Scheme procedures and syntax that modifies locations in
+the store (the Scheme model of the computer's memory) end with a ~!~
+by convention.
+
+[fn:3]When interactively testing our procedures and syntax (keywords),
+one has to be careful that we have given both the procedure and the
+keyword the same name.  Evaluating one of the definitions will
+overwrite the meaning of the other one.
+
+[fn:2]More precicely: as a variable holding a procedure value.
+
+[fn:1]This may change when the R7RS-large standardization effort is
+finished.  Both, R6RS and R7RS-small, are successors (and extensions)
+to R5RS (1998), but R7RS-small was never meant to be seen in isolation
+as a successor to R6RS.  Time will tell whether the R7RS large
+language will be able to replace R6RS when it is finally done.  It is
+planned to include the R6RS macro facility and the extensions
+discussed here in R7RS-large.
+
+#  LocalWords:  preprocessor expander homoiconic matchers Chez SRFI
+
+# Local Variables:
+# ispell-local-dictionary: "english"
+# End:
+#  LocalWords:  boolean inlined lex
