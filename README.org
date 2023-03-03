@@ -3056,7 +3056,56 @@ hand side, syntax parameters have the same problem associated to
 variables with dynamic scope: Their change of the behavior of code is
 not lexically confined.
 
-*** TODO Define integrable
+The [[https://cisco.github.io/ChezScheme/csug9.5/syntax.html#./syntax:h1][Chez Scheme User's Guide]] contains a very interesting use of syntax
+parameters, which we want to reproduce here:
+
+#+BEGIN_SRC scheme :results silent
+(define-syntax define-integrable
+  (syntax-rules (lambda)
+    [(_ name (lambda formals form1 form2 ...))
+     (begin
+       (define xname
+         (fluid-let-syntax ([name (identifier-syntax xname)])
+           (lambda formals form1 form2 ...)))
+       (define-syntax name
+         (lambda (x)
+           (syntax-case x ()
+             [_ (identifier? x) #'xname]
+             [(_ arg (... ...))
+              #'((fluid-let-syntax ([name (identifier-syntax xname)])
+                   (lambda formals form1 form2 ...))
+                  arg
+                  (... ...))]))))]))
+#+END_SRC
+
+The ~define-integrable~ keyword can be used as follows:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (define-integrable count
+    (lambda (ls)
+      (if (null? ls)
+          0
+          (+ (car ls) (count (cdr ls))))))
+
+  (list (count '(1 2 3))
+        (procedure? count))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(6 #t)
+#+end_example
+
+This definition binds ~count~ to a keyword that behaves like an
+immutable variable bound to a procedure.  However, when ~count~ is
+used in the form ~(count '(1 2 3))~ the procedures body is inlined at
+the macro use site, allowing for more local optimizations.  We chose
+the example of a recursive procedure because it demonstrates a
+difficulty: If ~count~ in the procedure's body were also inlined and
+so on, we would get an infinite macro expansion.  Instead, the
+implementation of ~define-integrable~ uses a syntax parameter to
+rebound ~count~ in the procedure body so that it is not further
+inlined.
 
 ** TODO Identifier properties
 
@@ -3134,7 +3183,7 @@ if there is none:
 ("value" "no-value")
 #+end_example
 
-
+*** TODO Some interesting example.
 
 * TODO Examples
 
@@ -3190,4 +3239,4 @@ planned to include the R6RS macro facility in R7RS-large.
 # Local Variables:
 # ispell-local-dictionary: "english"
 # End:
-#  LocalWords:  boolean
+#  LocalWords:  boolean inlined
