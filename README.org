@@ -3183,7 +3183,124 @@ if there is none:
 ("value" "no-value")
 #+end_example
 
-*** TODO Some interesting example.
+While this example theoretically describes how identifier properties
+work, it doesn't show their usefulness.  A more practical example is
+given by another loop macro, modeling general ~for~, we are going to
+present:
+
+#+BEGIN_SRC scheme :results silent
+  (define key)
+
+  (define-syntax define-iterator
+    (lambda (stx)
+      (syntax-case stx ()
+        [(define-iterator name parser-expr)
+         (identifier? #'name)
+         #'(begin
+             (define-syntax name
+               (lambda (stx)
+                 (syntax-violation 'name "invalid use of for keyword" stx)))
+             (define-property name key
+               (let ([parser parser-expr])
+                 (unless (procedure? parser)
+                   (assertion-violation 'define-iterator "invalid parser" parser))
+                 parser)))])))
+
+  (define-syntax for
+    (lambda (stx)
+      (lambda (lookup)
+        (define parse-clause
+          (lambda (cl)
+            (syntax-case cl ()
+              [(formals keyword . arg)
+               (identifier? #'keyword)
+               (let ([keyword #'keyword])
+                 (define parser (lookup keyword #'key))
+                 (unless (procedure? parser)
+                   (syntax-violation 'for "invalid for iterator" stx keyword))
+                 (let-values ([(outer-var* var* loop-var*
+                                outer-expr init-expr test-expr loop-expr step-expr)
+                               (parser stx cl)])
+                   (list outer-var* var* loop-var*
+                         outer-expr init-expr test-expr loop-expr step-expr)))])))
+        (syntax-case stx ()
+          [(_ (clause ...) command ...)
+           (with-syntax ([(((outer-var ...) (var ...) (loop-var ...)
+                            outer-expr init-expr test-expr loop-expr step-expr) ...)
+                          (map parse-clause #'(clause ...))])
+             #'(let-values ([(outer-var ...) outer-expr] ...)
+                 (let-values ([(var ...) init-expr] ...)
+                   (let f ([var var] ... ...)
+                     (unless (or test-expr ...)
+                       (let-values ([(loop-var ...) loop-expr] ...)
+                         command ...
+                         (let-values ([(var ...) step-expr] ...)
+                           (f var ... ...))))))))]))))
+
+  (define-iterator in-list
+    (lambda (stx cl)
+      (syntax-case cl ()
+        [(var _ list-expr)
+         (identifier? #'var)
+         (values #'()
+                 #'(tmp)
+                 #'(var)
+                 #'(values)
+                 #'list-expr
+                 #'(null? tmp)
+                 #'(car tmp)
+                 #'(cdr tmp))])))
+
+  (define-iterator in-range
+    (lambda (stx cl)
+      (syntax-case cl ()
+        [(var _ start-expr end-expr)
+         (identifier? #'var)
+         (values #'(end)
+                 #'(i)
+                 #'(var)
+                 #'end-expr
+                 #'start-expr
+                 #'(>= i end)
+                 #'i
+                 #'(+ i 1))])))
+#+END_SRC
+
+The public API for our new loop facility consists of the ~for~ keyword
+and the ~define-iterator~ defining keyword.  Moreover, we defined two
+iterator forms, one for going through a list and the other one for going
+through a numeric range.  The loop facility is extensible because the
+user can define more iterator forms using ~define-iterator~.
+
+A typical use of a ~for~ loop can look like the following:
+
+#+BEGIN_SRC scheme :results output :exports both :wrap example
+  (for ([x in-list '(a b c)]
+        [i in-range 0 10])
+    (display (list x i))
+    (newline))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(a 0)
+(b 1)
+(c 2)
+#+end_example
+
+In a language without a powerful macro system as Scheme possesses it,
+if it doesn't ship a suitable looping construct for our needs, we
+can't do anything except hoping for a future version of the language
+that includes more looping constructs.  In Scheme, on the other hand,
+a small and simple core suffices as we can build syntactic
+abstractions as much as we can build procedural abstractions
+ourselves.  Many advertised "brand new" features of en-vogue or
+not-so-en-vogue languages may sound like a big yawn to a Schemer.
+
+In our implementation of the ~for~ macro above, we used identifier
+properties on the iterator keywords to communicate with the main ~for~
+macro.  This hints at how we can build powerful, extensible
+sub-languages into Scheme.
 
 * Complex examples
 
@@ -3219,9 +3336,13 @@ if there is none:
    rest of the current loop iteration and the loop continues with the
    next iteration.
 
-8. Write a pattern matching Scheme macro.
+8. Modify the ~for~ macro into a functional form supporting
+   user-definable accumulators whose final result are returned by the
+   ~for~ expression.
 
-9. Write a version of the lex scanner generator as a Scheme macro.
+9. Write a pattern matching Scheme macro.
+
+10. Write a version of the lex scanner generator as a Scheme macro.
 
 * Footnotes
 [fn:11]In-depth advanced information can be found in the paper [[http://scheme2011.ucombinator.org/papers/Barzilay2011.pdf][Keeping
@@ -3266,7 +3387,8 @@ finished.  Both, R6RS and R7RS-small, are successors (and extensions)
 to R5RS (1998), but R7RS-small was never meant to be seen in isolation
 as a successor to R6RS.  Time will tell whether the R7RS large
 language will be able to replace R6RS when it is finally done.  It is
-planned to include the R6RS macro facility in R7RS-large.
+planned to include the R6RS macro facility and the extensions
+discussed here in R7RS-large.
 
 #  LocalWords:  preprocessor expander homoiconic matchers Chez SRFI
 
