@@ -2384,7 +2384,7 @@ can be found in the C99 standard.  With Scheme and its macro system,
 however, this becomes a library feature and need not be a language
 feature.
 
-** TODO Definitions of constants
+** Definitions of constants
 
 In Scheme, we can use ~define~ to, well, define a variable.  This
 variable can be ~set!~ by other parts of the code, possibly
@@ -2954,17 +2954,119 @@ Let us test our new version:
 return-who
 #+end_example
 
-** TODO Syntax parameters
+** Syntax parameters
+
+Syntax parameters, which are like aliases also described in a SRFI,
+namely [[https://srfi.schemers.org/srfi-139/srfi-139.html][SRFI 139]], provide an alternative to unhygienic macros when
+implicit macro parameters are needed.[fn:11]
+
+In what follows, we use Chez
+Scheme's implementation so that we can readily test our examples.
+
+Chez Scheme defines the ~fluid-let-syntax~ form, whose syntax is
+equivalent to ~let-syntax~, but which is to ~let-syntax~ as
+~fluid-let~ is to ~let~.  In other words, it rebinds a keyword for the
+dynamic extent of the expansion of the body of ~fluid-let-syntax~:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (let-syntax ([x (identifier-syntax 'outer)])
+    (define-syntax y (identifier-syntax x))
+    (list
+     (fluid-let-syntax ([x (identifier-syntax 'inner)])
+       y)
+     y))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(inner outer)
+#+end_example
+
+Compare this to ~let-syntax~:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (let-syntax ([x (identifier-syntax 'outer)])
+    (define-syntax y (identifier-syntax x))
+    (list
+     (let-syntax ([x (identifier-syntax 'inner)])
+       y)
+     y))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(outer outer)
+#+end_example
+
+With the use of syntax parameters (keywords that are rebound by
+~fluid-let-syntax~), we can give a definition of our ~loop~ macro as a
+hygienic macro:
+
+#+BEGIN_SRC scheme :results silent
+  (define-syntax break
+    (lambda (stx)
+      (syntax-violation 'break "invalid use outside of loop form" stx)))
+  (define-syntax loop
+    (syntax-rules ()
+      [(loop e ...)
+       (call/cc
+        (lambda (k)
+          (fluid-let-syntax
+              ([break (syntax-rules () [(break) (k)])])
+            (let f ()
+              e ... (f)))))]))
+#+END_SRC
+
+Let us test this new version:
+
+#+BEGIN_SRC scheme :results output :exports both :wrap example
+  (let ([i 0])
+    (loop
+      (when (= i 5)
+        (break))
+      (display i)
+      (newline)
+      (incr! i)))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+0
+1
+2
+3
+4
+#+end_example
+
+In this example, ~datum->syntax~ does not appear so the macro defined
+above is indeed hygienic.  The identifier ~break~ was not newly
+introduced by the macro use but already existed in the lexical context
+of the macro use.
+
+It should be noted that the new ~loop~ macro has a different semantics
+than the unhygienic ~loop~ macro from earlier.  In our original ~loop~
+macro, the expression ~(break)~ ends the loop when ~break~ is
+"~bound-identifier=?~" to the implicit identifier forged by the first
+version of the ~loop~ macro.  In the version with syntax parameters,
+the expression ~(break)~ ends the loop when ~break~ is
+"~free-identifier=?~" to the global identifier named ~break~.  Which
+semantics is the better one depends on the use case.  On the one hand
+side, hygienic macros are preferable to unhygienic ones.  On the other
+hand side, syntax parameters have the same problem associated to
+variables with dynamic scope: Their change of the behavior of code is
+not lexically confined.
+
+** Identifier properties
 
 
-
-** TODO Identifier properties
 
 * TODO Examples
 
 ** TODO Implementing a DSL
 
 * Footnotes
+[fn:11]In-depth advanced information can be found in the paper [[http://scheme2011.ucombinator.org/papers/Barzilay2011.pdf][Keeping
+it Clean with Syntax Parameters]].
 
 [fn:10]Remember that Scheme has first-class continuation.  But this is
 a topic for a different tutorial.
@@ -3007,7 +3109,7 @@ as a successor to R6RS.  Time will tell whether the R7RS large
 language will be able to replace R6RS when it is finally done.  It is
 planned to include the R6RS macro facility in R7RS-large.
 
-#  LocalWords:  preprocessor expander homoiconic matchers Chez
+#  LocalWords:  preprocessor expander homoiconic matchers Chez SRFI
 
 # Local Variables:
 # ispell-local-dictionary: "english"
