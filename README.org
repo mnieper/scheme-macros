@@ -3185,9 +3185,43 @@ if there is none:
 
 *** TODO Some interesting example.
 
-* TODO Examples
+* Complex examples
 
-** TODO Implementing a DSL
+** TODO An LR(1) parser generator implemented as a Scheme macro
+
+* Exercises
+
+1. Write a macro ~push!~ such that ~(push! list-variable expression)~
+   prepends the value of ~expression~ to the list bound to the
+   ~list-variable~.
+
+2. Write a macro ~when-all~ such that ~(when-all test-expression
+   ... expression)~ evaluates ~expression~ only if all
+   ~test-expressions~ evaluate to ~#f~.  The macro should
+   short-circuit the evaluation the ~test-expressions~ as soon as one
+   evaluates to ~#f~.
+
+3. Write a macro ~alist~ such that ~(alist key1 value key2 value2
+   ... )~ expands into a literal expression of the form ~'((key1
+   value1) (key2 value2) ...)~.
+
+4. Write a macro ~timestamp~ such that ~timestamp~ expands into a
+   number literal counting the number of uses of ~timestamp~.
+
+5. Rewrite ~fluid-let~ as a recursive macro that does not use
+   ~generate-temporaries~.
+
+6. Write a procedure ~symbolic-identifier=?~ so that
+   ~(symbolic-identifier=? id1 id2)~ returns ~#t~ if and only if the
+   two identifiers ~id1~ and ~id2~ have the same symbolic name.
+
+7. Extend the ~loop~ macro so that evaluating ~(continue)~ skips the
+   rest of the current loop iteration and the loop continues with the
+   next iteration.
+
+8. Write a pattern matching Scheme macro.
+
+9. Write a version of the lex scanner generator as a Scheme macro.
 
 * Footnotes
 [fn:11]In-depth advanced information can be found in the paper [[http://scheme2011.ucombinator.org/papers/Barzilay2011.pdf][Keeping
@@ -3239,4 +3273,4 @@ planned to include the R6RS macro facility in R7RS-large.
 # Local Variables:
 # ispell-local-dictionary: "english"
 # End:
-#  LocalWords:  boolean inlined
+#  LocalWords:  boolean inlined lex
