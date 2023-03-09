@@ -199,7 +199,7 @@ Scheme does not provide such an operator, but, fortunately, it doesn't
 have to because we can build one ourself.
 
 Our first attempt could be to write a procedure (the primary means of
-abstraction in functional programming languages)[fn:4]:
+abstraction in functional programming languages)[fn:2]:
 #+BEGIN_SRC scheme :results silent
   (define incr!
     (lambda (x)
@@ -226,7 +226,7 @@ called with the argument ~1~.  This is then bound to a new variable
 ~x~ locally to ~incr!~.  It is this variable, which is increased by 1
 and not the top-level variable.
 
-The solution is, of course, to define ~incr!~ not as a procedure[fn:2]
+The solution is, of course, to define ~incr!~ not as a procedure[fn:3]
 but as a keyword.  In the Scheme programming language, the
 ~define-syntax~ keyword can be used for it:
 
@@ -249,7 +249,7 @@ variables in the template are replaced with the forms they are bound
 to and the substituted template is then used in place of the macro.
 
 In the following example, ~(incr! y)~ is effectively substituted by
-~(set! y (+ y 1))~, so we have achieved what we wanted[fn:3]:
+~(set! y (+ y 1))~, so we have achieved what we wanted[fn:4]:
 
 #+BEGIN_SRC scheme :exports both :wrap example
   (define y 10)
@@ -3436,42 +3436,6 @@ of tokens and is used in the following example:
 11. Write a version of the lex scanner generator as a Scheme macro.
 
 * Footnotes
-[fn:11]In-depth advanced information can be found in the paper [[http://scheme2011.ucombinator.org/papers/Barzilay2011.pdf][Keeping
-it Clean with Syntax Parameters]].
-
-[fn:10]Remember that Scheme has first-class continuation.  But this is
-a topic for a different tutorial.
-
-[fn:9]In fact, the standard binding constructs in Scheme ~let~,
-~let*~, or ~letrec~ can also be defined as macro keywords in terms of
-the more primitive ~lambda~ using the macro facility described in this
-report.
-
-[fn:8]When used in programs or libraries, there is one problem in the
-first approach because of so-called phasing issues.  We will come back
-to this.
-
-[fn:7]The term "history" of an identifier is not an established one
-but was invented for this presentation.
-
-[fn:6]Note that this cannot be done with C preprocessor macros.
-
-[fn:5]Such a form is predefined in Chez Scheme, but is not part of the
-Scheme standard.  In fact, Chez Scheme's version properly handles tail
-calls, which our simple version doesn't.
-
-[fn:4]While Scheme does not forbid mutation (like ML but unlike
-Haskell), the pitfalls of impure code are well-understood.  Therefore,
-the names of Scheme procedures and syntax that modifies locations in
-the store (the Scheme model of the computer's memory) end with a ~!~
-by convention.
-
-[fn:3]When interactively testing our procedures and syntax (keywords),
-one has to be careful that we have given both the procedure and the
-keyword the same name.  Evaluating one of the definitions will
-overwrite the meaning of the other one.
-
-[fn:2]More precicely: as a variable holding a procedure value.
 
 [fn:1]This may change when the R7RS-large standardization effort is
 finished.  Both, R6RS and R7RS-small, are successors (and extensions)
@@ -3482,6 +3446,43 @@ planned to include the R6RS macro facility and the extensions
 discussed here in R7RS-large.
 
 #  LocalWords:  preprocessor expander homoiconic matchers Chez SRFI
+
+[fn:2]While Scheme does not forbid mutation (like ML but unlike
+Haskell), the pitfalls of impure code are well-understood.  Therefore,
+the names of Scheme procedures and syntax that modifies locations in
+the store (the Scheme model of the computer's memory) end with a ~!~
+by convention.
+
+[fn:3]More precicely: as a variable holding a procedure value.
+
+[fn:4]When interactively testing our procedures and syntax (keywords),
+one has to be careful that we have given both the procedure and the
+keyword the same name.  Evaluating one of the definitions will
+overwrite the meaning of the other one.
+
+[fn:5]Such a form is predefined in Chez Scheme, but is not part of the
+Scheme standard.  In fact, Chez Scheme's version properly handles tail
+calls, which our simple version doesn't.
+
+[fn:6]Note that this cannot be done with C preprocessor macros.
+
+[fn:7]The term "history" of an identifier is not an established one
+but was invented for this presentation.
+
+[fn:8]When used in programs or libraries, there is one problem in the
+first approach because of so-called phasing issues.  We will come back
+to this.
+
+[fn:9]In fact, the standard binding constructs in Scheme ~let~,
+~let*~, or ~letrec~ can also be defined as macro keywords in terms of
+the more primitive ~lambda~ using the macro facility described in this
+report.
+
+[fn:10]Remember that Scheme has first-class continuation.  But this is
+a topic for a different tutorial.
+
+[fn:11]In-depth advanced information can be found in the paper [[http://scheme2011.ucombinator.org/papers/Barzilay2011.pdf][Keeping
+it Clean with Syntax Parameters]].
 
 # Local Variables:
 # ispell-local-dictionary: "english"
