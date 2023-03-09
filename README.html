@@ -3,7 +3,7 @@
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
-<!-- 2023-03-03 Fri 19:39 -->
+<!-- 2023-03-09 Thu 17:06 -->
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Extending a Language &#x2014; Writing Powerful Macros in Scheme</title>
@@ -201,77 +201,78 @@
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents" role="doc-toc">
 <ul>
-<li><a href="#org4232666">1. Preface</a></li>
-<li><a href="#orgbd5d09c">2. Prerequisites</a>
+<li><a href="#org6611a2d">1. Preface</a></li>
+<li><a href="#orgf9c747e">2. Prerequisites</a>
 <ul>
-<li><a href="#org45aa755">2.1. Chez Scheme</a></li>
-<li><a href="#org1fcf838">2.2. Emacs</a></li>
-<li><a href="#org462ecb3">2.3. Org</a></li>
-<li><a href="#org9e54c01">2.4. Geiser</a></li>
-<li><a href="#org4e6f603">2.5. Paredit</a></li>
-<li><a href="#org20d2f57">2.6. Initialization</a></li>
+<li><a href="#orge43e3d9">2.1. Chez Scheme</a></li>
+<li><a href="#orgaa36917">2.2. Emacs</a></li>
+<li><a href="#org36d98c1">2.3. Org</a></li>
+<li><a href="#org42af0d7">2.4. Geiser</a></li>
+<li><a href="#org04788ff">2.5. Paredit</a></li>
+<li><a href="#orgc33891f">2.6. Initialization</a></li>
 </ul>
 </li>
-<li><a href="#org431a35b">3. The Scheme programming language</a></li>
-<li><a href="#org0bf8fcb">4. Some simple macros</a>
+<li><a href="#org377870a">3. The Scheme programming language</a></li>
+<li><a href="#orgb72210a">4. Some simple macros</a>
 <ul>
-<li><a href="#orgd115e6c">4.1. Incrementing a variable</a></li>
-<li><a href="#org1e0ab90">4.2. A tracing <code>let</code></a></li>
-<li><a href="#org53175eb">4.3. Accessing vector locations through variables</a></li>
+<li><a href="#org62bbcd5">4.1. Incrementing a variable</a></li>
+<li><a href="#org88bae46">4.2. A tracing <code>let</code></a></li>
+<li><a href="#org45638a5">4.3. Accessing vector locations through variables</a></li>
 </ul>
 </li>
-<li><a href="#org1a13aa6">5. Syntax objects</a>
+<li><a href="#org7f65354">5. Syntax objects</a>
 <ul>
-<li><a href="#org4b8bfe3">5.1. Identifiers</a></li>
-<li><a href="#org49a5f84">5.2. Constructing syntax objects</a></li>
-<li><a href="#org956bbfd">5.3. Destructing syntax objects</a></li>
+<li><a href="#org411e766">5.1. Identifiers</a></li>
+<li><a href="#orgabd305d">5.2. Constructing syntax objects</a></li>
+<li><a href="#orgcf186bb">5.3. Destructing syntax objects</a></li>
 </ul>
 </li>
-<li><a href="#org29252e7">6. Syntax-case macros</a>
+<li><a href="#org4e4fe76">6. Syntax-case macros</a>
 <ul>
-<li><a href="#orgefce174">6.1. Macro transformers</a></li>
-<li><a href="#orgfbc77b6">6.2. A fluid <code>let</code></a></li>
-<li><a href="#orgda0dac7">6.3. Implementing a variant type in Scheme</a></li>
+<li><a href="#orgf1e8c38">6.1. Macro transformers</a></li>
+<li><a href="#org9ad4f08">6.2. A fluid <code>let</code></a></li>
+<li><a href="#org2a2cc89">6.3. Implementing a variant type in Scheme</a></li>
 </ul>
 </li>
-<li><a href="#orgec66e66">7. Breaking hygiene</a>
+<li><a href="#orgf67db64">7. Breaking hygiene</a>
 <ul>
-<li><a href="#org58501e5">7.1. A classical loop macro</a></li>
-<li><a href="#orgbf7b99b">7.2. Convenience syntax to bind implicit identifiers</a></li>
-<li><a href="#org82e2576">7.3. Definitions that make the bound name accessible</a></li>
-<li><a href="#orgbab7b87">7.4. Definitions of constants</a></li>
-<li><a href="#orgc24df42">7.5. A pitfall</a></li>
+<li><a href="#org020a5a3">7.1. A classical loop macro</a></li>
+<li><a href="#org727c9de">7.2. Convenience syntax to bind implicit identifiers</a></li>
+<li><a href="#org2c645c6">7.3. Definitions that make the bound name accessible</a></li>
+<li><a href="#org2425df9">7.4. Definitions of constants</a></li>
+<li><a href="#org000b7fa">7.5. A pitfall</a></li>
 </ul>
 </li>
-<li><a href="#org3e5fe8e">8. Phasing</a>
+<li><a href="#org85581d7">8. Phasing</a>
 <ul>
-<li><a href="#org206cb6b">8.1. (Relative) phases</a></li>
-<li><a href="#org8939f5d">8.2. Identifier references at different phases</a></li>
+<li><a href="#org4f580b4">8.1. (Relative) phases</a></li>
+<li><a href="#orgb7a52eb">8.2. Identifier references at different phases</a></li>
 </ul>
 </li>
-<li><a href="#org1a3bf27">9. Extensions</a>
+<li><a href="#org9d48857">9. Extensions</a>
 <ul>
-<li><a href="#org3d15ab3">9.1. Aliases</a></li>
-<li><a href="#org6dc84df">9.2. Syntax parameters</a></li>
-<li><a href="#orga53a194">9.3. Identifier properties</a></li>
+<li><a href="#org0fd5875">9.1. Aliases</a></li>
+<li><a href="#orgcfe517e">9.2. Syntax parameters</a></li>
+<li><a href="#orgbf1d363">9.3. Identifier properties</a></li>
 </ul>
 </li>
-<li><a href="#orgcaac5ff">10. Complex examples</a>
+<li><a href="#org28a9422">10. Complex examples</a>
 <ul>
-<li><a href="#org481ecf5">10.1. <span class="todo TODO">TODO</span> An LR(1) parser generator implemented as a Scheme macro</a></li>
+<li><a href="#orgfe7512d">10.1. An LR(1) parser generator implemented as a Scheme macro</a></li>
 </ul>
 </li>
-<li><a href="#orgcbf1b3f">11. Exercises</a></li>
+<li><a href="#orgd9c6470">11. Exercises</a></li>
 </ul>
 </div>
 </div>
 <p>
 The canonical HTML-formatted version of this document can be found at
-<a href="https://mnieper.github.io/scheme-macros/README.html">https://mnieper.github.io/scheme-macros/README.html</a>.
+<a href="https://mnieper.github.io/scheme-macros/README.html">https://mnieper.github.io/scheme-macros/README.html</a>.  The interactive
+Org document is hosted at <a href="https://github.com/mnieper/scheme-macros">https://github.com/mnieper/scheme-macros</a>.
 </p>
 
-<div id="outline-container-org4232666" class="outline-2">
-<h2 id="org4232666"><span class="section-number-2">1.</span> Preface</h2>
+<div id="outline-container-org6611a2d" class="outline-2">
+<h2 id="org6611a2d"><span class="section-number-2">1.</span> Preface</h2>
 <div class="outline-text-2" id="text-1">
 <p>
 This document is an introduction to writing powerful macros in Scheme.
@@ -315,12 +316,12 @@ session.  In the following section, a possible setup is described.
 </div>
 </div>
 
-<div id="outline-container-orgbd5d09c" class="outline-2">
-<h2 id="orgbd5d09c"><span class="section-number-2">2.</span> Prerequisites</h2>
+<div id="outline-container-orgf9c747e" class="outline-2">
+<h2 id="orgf9c747e"><span class="section-number-2">2.</span> Prerequisites</h2>
 <div class="outline-text-2" id="text-2">
 </div>
-<div id="outline-container-org45aa755" class="outline-3">
-<h3 id="org45aa755"><span class="section-number-3">2.1.</span> Chez Scheme</h3>
+<div id="outline-container-orge43e3d9" class="outline-3">
+<h3 id="orge43e3d9"><span class="section-number-3">2.1.</span> Chez Scheme</h3>
 <div class="outline-text-3" id="text-2-1">
 <p>
 We need a Scheme implementation.  This tutorial assumes <a href="https://cisco.github.io/ChezScheme/">Chez Scheme</a>,
@@ -331,8 +332,8 @@ Debian-based GNU/Linux system like Ubuntu, it is prepackaged.
 </div>
 </div>
 
-<div id="outline-container-org1fcf838" class="outline-3">
-<h3 id="org1fcf838"><span class="section-number-3">2.2.</span> Emacs</h3>
+<div id="outline-container-orgaa36917" class="outline-3">
+<h3 id="orgaa36917"><span class="section-number-3">2.2.</span> Emacs</h3>
 <div class="outline-text-3" id="text-2-2">
 <p>
 We will use <a href="https://www.gnu.org/software/emacs/">GNU Emacs</a> as our development environment, which has great
@@ -347,8 +348,8 @@ Likewise, enable the <a href="https://elpa.nongnu.org/nongnu-devel/">NonGNU-deve
 </div>
 </div>
 
-<div id="outline-container-org462ecb3" class="outline-3">
-<h3 id="org462ecb3"><span class="section-number-3">2.3.</span> Org</h3>
+<div id="outline-container-org36d98c1" class="outline-3">
+<h3 id="org36d98c1"><span class="section-number-3">2.3.</span> Org</h3>
 <div class="outline-text-3" id="text-2-3">
 <p>
 <a href="https://orgmode.org/">Org Mode</a> is a GNU Emacs major mode that allows to document, edit and
@@ -368,8 +369,8 @@ document</a>, especially how to <a href="https://orgmode.org/org.html#Editing-So
 </div>
 </div>
 
-<div id="outline-container-org9e54c01" class="outline-3">
-<h3 id="org9e54c01"><span class="section-number-3">2.4.</span> Geiser</h3>
+<div id="outline-container-org42af0d7" class="outline-3">
+<h3 id="org42af0d7"><span class="section-number-3">2.4.</span> Geiser</h3>
 <div class="outline-text-3" id="text-2-4">
 <p>
 <a href="https://www.nongnu.org/geiser/">Geiser</a> is a GNU Emacs package that allows to runs Scheme processes in
@@ -380,8 +381,8 @@ menu</a>.  We need the most recent development version.
 </div>
 </div>
 
-<div id="outline-container-org4e6f603" class="outline-3">
-<h3 id="org4e6f603"><span class="section-number-3">2.5.</span> Paredit</h3>
+<div id="outline-container-org04788ff" class="outline-3">
+<h3 id="org04788ff"><span class="section-number-3">2.5.</span> Paredit</h3>
 <div class="outline-text-3" id="text-2-5">
 <p>
 <a href="https://paredit.org/">Paredit</a>, a tool for parenthetical editing in Emacs makes working with
@@ -391,8 +392,8 @@ through GNU Emacs' package manager.
 </div>
 </div>
 
-<div id="outline-container-org20d2f57" class="outline-3">
-<h3 id="org20d2f57"><span class="section-number-3">2.6.</span> Initialization</h3>
+<div id="outline-container-orgc33891f" class="outline-3">
+<h3 id="orgc33891f"><span class="section-number-3">2.6.</span> Initialization</h3>
 <div class="outline-text-3" id="text-2-6">
 <p>
 After the GNU Emacs packages have been installed, we want to customize
@@ -422,8 +423,8 @@ Emacs.
 </div>
 </div>
 
-<div id="outline-container-org431a35b" class="outline-2">
-<h2 id="org431a35b"><span class="section-number-2">3.</span> The Scheme programming language</h2>
+<div id="outline-container-org377870a" class="outline-2">
+<h2 id="org377870a"><span class="section-number-2">3.</span> The Scheme programming language</h2>
 <div class="outline-text-2" id="text-3">
 <p>
 Scheme is programming language of the Lisp family.  Its defining
@@ -465,8 +466,8 @@ so for any application area, there will be a suitable Scheme system.
 </div>
 </div>
 
-<div id="outline-container-org0bf8fcb" class="outline-2">
-<h2 id="org0bf8fcb"><span class="section-number-2">4.</span> Some simple macros</h2>
+<div id="outline-container-orgb72210a" class="outline-2">
+<h2 id="orgb72210a"><span class="section-number-2">4.</span> Some simple macros</h2>
 <div class="outline-text-2" id="text-4">
 <p>
 Let us call a <i>combination</i> an expression in Scheme of the form
@@ -486,7 +487,7 @@ An example is given by the following expression evaluating to the answer of life
 </pre>
 </div>
 
-<pre class="example" id="org593ccb8">
+<pre class="example" id="org3c65143">
 42
 </pre>
 
@@ -508,7 +509,7 @@ this evaluation strategy.  An example is given by the conditional <code>if</code
 </pre>
 </div>
 
-<pre class="example" id="org37c540a">
+<pre class="example" id="orgee29f95">
 ok
 </pre>
 
@@ -522,8 +523,8 @@ define their own keywords.
 </p>
 </div>
 
-<div id="outline-container-orgd115e6c" class="outline-3">
-<h3 id="orgd115e6c"><span class="section-number-3">4.1.</span> Incrementing a variable</h3>
+<div id="outline-container-org62bbcd5" class="outline-3">
+<h3 id="org62bbcd5"><span class="section-number-3">4.1.</span> Incrementing a variable</h3>
 <div class="outline-text-3" id="text-4-1">
 <p>
 Let us ignore for a moment that mutation is frowned upon in functional
@@ -564,7 +565,7 @@ x
 </pre>
 </div>
 
-<pre class="example" id="org0681257">
+<pre class="example" id="org5225610">
 1
 </pre>
 
@@ -617,7 +618,7 @@ y
 </pre>
 </div>
 
-<pre class="example" id="org820e99b">
+<pre class="example" id="org4bfcc58">
 11
 </pre>
 
@@ -639,7 +640,7 @@ rebound as in the following example:
 </pre>
 </div>
 
-<pre class="example" id="org86b3f30">
+<pre class="example" id="orgae3d2f7">
 3
 </pre>
 
@@ -658,7 +659,7 @@ refers to <code>set!</code>, in the body of the <code>let</code> form:
 </pre>
 </div>
 
-<pre class="example" id="org49f4b56">
+<pre class="example" id="orgf53d13f">
 2
 </pre>
 
@@ -692,7 +693,7 @@ languages and lexical scoping:
 </pre>
 </div>
 
-<pre class="example" id="org5726de0">
+<pre class="example" id="org256fe30">
 (1 1)
 </pre>
 
@@ -711,7 +712,7 @@ We finish this subsection with another example of hygiene:
 </pre>
 </div>
 
-<pre class="example" id="org93167b8">
+<pre class="example" id="org10430ed">
 3
 </pre>
 
@@ -730,8 +731,8 @@ to the lexical binding of <code>set!</code> as a let-bound variable.
 </div>
 </div>
 
-<div id="outline-container-org1e0ab90" class="outline-3">
-<h3 id="org1e0ab90"><span class="section-number-3">4.2.</span> A tracing <code>let</code></h3>
+<div id="outline-container-org88bae46" class="outline-3">
+<h3 id="org88bae46"><span class="section-number-3">4.2.</span> A tracing <code>let</code></h3>
 <div class="outline-text-3" id="text-4-2">
 <p>
 Simple loops are often written using the named <code>let</code> form as in the following example:
@@ -838,7 +839,7 @@ When we run the following test, we see the given result printed.
 </pre>
 </div>
 
-<pre class="example" id="orgaf0ddc3">
+<pre class="example" id="orgc6dec6d">
 |(f 3)
 | (f 2)
 | |(f 1)
@@ -891,7 +892,7 @@ Let us briefly test our new extended macro:
 </pre>
 </div>
 
-<pre class="example" id="org14bde85">
+<pre class="example" id="orgddfd641">
 (11 21)
 </pre>
 
@@ -957,14 +958,14 @@ Let us not forget to test the new version of the macro:
 </pre>
 </div>
 
-<pre class="example" id="orgabebfa4">
+<pre class="example" id="org57c7dfb">
 (101 201)
 </pre>
 </div>
 </div>
 
-<div id="outline-container-org53175eb" class="outline-3">
-<h3 id="org53175eb"><span class="section-number-3">4.3.</span> Accessing vector locations through variables</h3>
+<div id="outline-container-org45638a5" class="outline-3">
+<h3 id="org45638a5"><span class="section-number-3">4.3.</span> Accessing vector locations through variables</h3>
 <div class="outline-text-3" id="text-4-3">
 <p>
 A <i>vector</i> in Scheme is a collection of locations in the store that
@@ -978,7 +979,7 @@ v
 </pre>
 </div>
 
-<pre class="example" id="org44fabf8">
+<pre class="example" id="orgfb5f7f6">
 #(1 2 3)
 </pre>
 
@@ -991,7 +992,7 @@ Vector elements can be retrieved using <code>vector-ref</code> and mutated using
 </pre>
 </div>
 
-<pre class="example" id="orgcc8bc6c">
+<pre class="example" id="orgddfa75e">
 3
 </pre>
 
@@ -1001,7 +1002,7 @@ v
 </pre>
 </div>
 
-<pre class="example" id="orgadc04ec">
+<pre class="example" id="org263fa87">
 #(1 4 3)
 </pre>
 
@@ -1023,7 +1024,7 @@ v
 </pre>
 </div>
 
-<pre class="example" id="org90fe3ea">
+<pre class="example" id="orgc1417d3">
 #(1 5 3)
 </pre>
 
@@ -1067,7 +1068,7 @@ v
 </pre>
 </div>
 
-<pre class="example" id="orgd513966">
+<pre class="example" id="orgd663d51">
 #(2 5 3)
 </pre>
 
@@ -1086,8 +1087,8 @@ variable would be accessed.
 </div>
 </div>
 
-<div id="outline-container-org1a13aa6" class="outline-2">
-<h2 id="org1a13aa6"><span class="section-number-2">5.</span> Syntax objects</h2>
+<div id="outline-container-org7f65354" class="outline-2">
+<h2 id="org7f65354"><span class="section-number-2">5.</span> Syntax objects</h2>
 <div class="outline-text-2" id="text-5">
 <p>
 The Scheme reports define hygiene and referential transparency for
@@ -1116,8 +1117,8 @@ hood.
 </p>
 </div>
 
-<div id="outline-container-org4b8bfe3" class="outline-3">
-<h3 id="org4b8bfe3"><span class="section-number-3">5.1.</span> Identifiers</h3>
+<div id="outline-container-org411e766" class="outline-3">
+<h3 id="org411e766"><span class="section-number-3">5.1.</span> Identifiers</h3>
 <div class="outline-text-3" id="text-5-1">
 <p>
 The Lisp languages, and thus Scheme as well, are homoiconic
@@ -1186,7 +1187,7 @@ the syntax <code>(quote name)</code>, which can be abbreviated to <code>'name</c
 </pre>
 </div>
 
-<pre class="example" id="orgc1f1f2d">
+<pre class="example" id="org35172d8">
 red
 </pre>
 
@@ -1201,7 +1202,7 @@ but use the syntax <code>(syntax identifier)</code>, which can be abbreviated to
 </pre>
 </div>
 
-<pre class="example" id="org19ba938">
+<pre class="example" id="orgb655d4b">
 #&lt;syntax x&gt;
 </pre>
 
@@ -1235,7 +1236,7 @@ a symbol, namely its underlying symbolic name:
 </pre>
 </div>
 
-<pre class="example" id="org42e530f">
+<pre class="example" id="org81e7240">
 x
 </pre>
 
@@ -1257,7 +1258,7 @@ already give some understanding:
 </pre>
 </div>
 
-<pre class="example" id="org7e6997b">
+<pre class="example" id="orgee4e901">
 (#t #f)
 </pre>
 
@@ -1281,7 +1282,7 @@ Let us now consider two simple examples for <code>free-identifier=?</code>:
 </pre>
 </div>
 
-<pre class="example" id="org6eca46d">
+<pre class="example" id="org2d6942a">
 #t
 </pre>
 
@@ -1302,7 +1303,7 @@ The second example is a bit more interesting:
 </pre>
 </div>
 
-<pre class="example" id="org58e6704">
+<pre class="example" id="orgf1c7ed9">
 #f
 </pre>
 
@@ -1329,7 +1330,7 @@ next example.
 </pre>
 </div>
 
-<pre class="example" id="orgd108aa8">
+<pre class="example" id="org8aedaf8">
 (#t #f)
 </pre>
 
@@ -1361,7 +1362,7 @@ must have the same symbolic name, but the other implication is not.  To show thi
 </pre>
 </div>
 
-<pre class="example" id="orga787153">
+<pre class="example" id="org0ab3999">
 (#f #t)
 </pre>
 
@@ -1402,7 +1403,7 @@ violated otherwise.  Consider the following example:
 </pre>
 </div>
 
-<pre class="example" id="org6759635">
+<pre class="example" id="org779459a">
 3
 </pre>
 
@@ -1444,7 +1445,7 @@ Let us take another view at this example:
 </pre>
 </div>
 
-<pre class="example" id="org0b7b9fb">
+<pre class="example" id="orgb593e4e">
 (#f #t)
 </pre>
 
@@ -1486,7 +1487,7 @@ which the context is taken.
 </pre>
 </div>
 
-<pre class="example" id="orgbba0393">
+<pre class="example" id="orga0bc9e9">
 (#t #t)
 </pre>
 
@@ -1512,14 +1513,14 @@ in the call to <code>bound-identifier=?</code>.
 </pre>
 </div>
 
-<pre class="example" id="orge8675f0">
+<pre class="example" id="org99f3d58">
 #t
 </pre>
 </div>
 </div>
 
-<div id="outline-container-org49a5f84" class="outline-3">
-<h3 id="org49a5f84"><span class="section-number-3">5.2.</span> Constructing syntax objects</h3>
+<div id="outline-container-orgabd305d" class="outline-3">
+<h3 id="orgabd305d"><span class="section-number-3">5.2.</span> Constructing syntax objects</h3>
 <div class="outline-text-3" id="text-5-2">
 <p>
 In the previous section we learned that Scheme code cannot be
@@ -1572,7 +1573,7 @@ We can construct the syntax object in the above example as a Scheme value:
 </pre>
 </div>
 
-<pre class="example" id="orgb5df9cf">
+<pre class="example" id="orgc341733">
 (1 2 #&lt;syntax foo&gt;)
 </pre>
 
@@ -1587,7 +1588,7 @@ expected corresponding (datum) value:
 </pre>
 </div>
 
-<pre class="example" id="org94fe121">
+<pre class="example" id="org3c45042">
 (1 2 foo)
 </pre>
 
@@ -1601,7 +1602,7 @@ test whether a syntax object is an identifier or not:
 </pre>
 </div>
 
-<pre class="example" id="org9df4e42">
+<pre class="example" id="org327d581">
 (#f #f #t)
 </pre>
 
@@ -1618,7 +1619,7 @@ complicated syntax objects:
 </pre>
 </div>
 
-<pre class="example" id="org3f9f335">
+<pre class="example" id="org3728ec9">
 #&lt;syntax (1 2 foo)&gt;
 </pre>
 
@@ -1640,7 +1641,7 @@ Whether wrapped or not, we can apply <code>syntax-&gt;datum</code> on this synta
 </pre>
 </div>
 
-<pre class="example" id="org4bbcd4f">
+<pre class="example" id="org7504658">
 (1 2 foo)
 </pre>
 
@@ -1650,8 +1651,8 @@ Here, we used again the abbreviation <code>#'</code> for <code>syntax</code>.
 </div>
 </div>
 
-<div id="outline-container-org956bbfd" class="outline-3">
-<h3 id="org956bbfd"><span class="section-number-3">5.3.</span> Destructing syntax objects</h3>
+<div id="outline-container-orgcf186bb" class="outline-3">
+<h3 id="orgcf186bb"><span class="section-number-3">5.3.</span> Destructing syntax objects</h3>
 <div class="outline-text-3" id="text-5-3">
 <p>
 The syntax object returned by <code>#'(1 2 foo)</code> cannot be destructed using
@@ -1675,7 +1676,7 @@ first pattern that matches is evaluated:
 </pre>
 </div>
 
-<pre class="example" id="orgccc30dd">
+<pre class="example" id="org8595a04">
 case-5
 </pre>
 
@@ -1703,7 +1704,7 @@ Let us try to distinguish the syntax objects returned by <code>#'(1 2 foo)</code
 </pre>
 </div>
 
-<pre class="example" id="org35d9c3a">
+<pre class="example" id="org6b9cfe3">
 bar
 </pre>
 
@@ -1724,7 +1725,7 @@ so far:
 </pre>
 </div>
 
-<pre class="example" id="org8223f50">
+<pre class="example" id="orgcb2bdcb">
 foo
 </pre>
 
@@ -1748,7 +1749,7 @@ how the binding comes into play:
 </pre>
 </div>
 
-<pre class="example" id="orge829a58">
+<pre class="example" id="orgc7273a1">
 no-match
 </pre>
 
@@ -1770,7 +1771,7 @@ pattern variables are neither.  They may only be referenced inside the
 </pre>
 </div>
 
-<pre class="example" id="orgb9aad7b">
+<pre class="example" id="org368530d">
 #&lt;syntax x&gt;
 </pre>
 
@@ -1791,7 +1792,7 @@ the same <code>syntax</code> expression also works:
 </pre>
 </div>
 
-<pre class="example" id="org6dbc4dc">
+<pre class="example" id="orgaadf488">
 (#&lt;syntax b&gt; #&lt;syntax x&gt;)
 </pre>
 
@@ -1810,7 +1811,7 @@ used.  The following is another example:
 </pre>
 </div>
 
-<pre class="example" id="orgec0e1c7">
+<pre class="example" id="orgdc844f6">
 (#&lt;syntax a&gt; #&lt;syntax 2&gt; #&lt;syntax 3&gt; . #&lt;syntax (b c)&gt;)
 </pre>
 
@@ -1839,7 +1840,7 @@ individual elements or to calculate lengthes:
 </pre>
 </div>
 
-<pre class="example" id="org317be25">
+<pre class="example" id="org8537af5">
 4
 </pre>
 
@@ -1860,7 +1861,7 @@ in the following example:
 </pre>
 </div>
 
-<pre class="example" id="orga697780">
+<pre class="example" id="org067ab0a">
 error
 </pre>
 
@@ -1881,12 +1882,12 @@ does not bind a pattern variable.
 </div>
 </div>
 
-<div id="outline-container-org29252e7" class="outline-2">
-<h2 id="org29252e7"><span class="section-number-2">6.</span> Syntax-case macros</h2>
+<div id="outline-container-org4e4fe76" class="outline-2">
+<h2 id="org4e4fe76"><span class="section-number-2">6.</span> Syntax-case macros</h2>
 <div class="outline-text-2" id="text-6">
 </div>
-<div id="outline-container-orgefce174" class="outline-3">
-<h3 id="orgefce174"><span class="section-number-3">6.1.</span> Macro transformers</h3>
+<div id="outline-container-orgf1e8c38" class="outline-3">
+<h3 id="orgf1e8c38"><span class="section-number-3">6.1.</span> Macro transformers</h3>
 <div class="outline-text-3" id="text-6-1">
 <p>
 We started this tutorial with writing macros and discussing a number
@@ -1927,7 +1928,7 @@ check this:
 </pre>
 </div>
 
-<pre class="example" id="org6740345">
+<pre class="example" id="orgbd6936d">
 84
 </pre>
 
@@ -1962,7 +1963,7 @@ We can test this procedure as any other procedure:
 </pre>
 </div>
 
-<pre class="example" id="orgff9ca51">
+<pre class="example" id="orgb42f8f7">
 (#&lt;syntax quote&gt; (3 (#&lt;syntax a&gt; #&lt;syntax b&gt; #&lt;syntax c&gt;)))
 </pre>
 
@@ -2046,7 +2047,7 @@ Let's test our macro:
 </pre>
 </div>
 
-<pre class="example" id="orga95249e">
+<pre class="example" id="orgb100b06">
 (3 a b c)
 </pre>
 
@@ -2144,8 +2145,8 @@ in <code>(incr! 2)</code>.
 </div>
 </div>
 
-<div id="outline-container-orgfbc77b6" class="outline-3">
-<h3 id="orgfbc77b6"><span class="section-number-3">6.2.</span> A fluid <code>let</code></h3>
+<div id="outline-container-org9ad4f08" class="outline-3">
+<h3 id="org9ad4f08"><span class="section-number-3">6.2.</span> A fluid <code>let</code></h3>
 <div class="outline-text-3" id="text-6-2">
 <p>
 We should finally move past the <code>incr!</code> macro.  We already remarked
@@ -2353,8 +2354,8 @@ With this tool at our disposal, we can finally write a version of
 </div>
 </div>
 
-<div id="outline-container-orgda0dac7" class="outline-3">
-<h3 id="orgda0dac7"><span class="section-number-3">6.3.</span> Implementing a variant type in Scheme</h3>
+<div id="outline-container-org2a2cc89" class="outline-3">
+<h3 id="org2a2cc89"><span class="section-number-3">6.3.</span> Implementing a variant type in Scheme</h3>
 <div class="outline-text-3" id="text-6-3">
 <p>
 It is time to demonstrate more involved macros to highlight some
@@ -2653,7 +2654,7 @@ written <code>tree-accumulate</code>:
 </pre>
 </div>
 
-<pre class="example" id="orgdc46a32">
+<pre class="example" id="orgfc7e2c0">
 14
 </pre>
 
@@ -2774,15 +2775,15 @@ Now we can redefine <code>tree-accumulate</code> and test it:
 </pre>
 </div>
 
-<pre class="example" id="org48a148a">
+<pre class="example" id="orgc285730">
 14
 </pre>
 </div>
 </div>
 </div>
 
-<div id="outline-container-orgec66e66" class="outline-2">
-<h2 id="orgec66e66"><span class="section-number-2">7.</span> Breaking hygiene</h2>
+<div id="outline-container-orgf67db64" class="outline-2">
+<h2 id="orgf67db64"><span class="section-number-2">7.</span> Breaking hygiene</h2>
 <div class="outline-text-2" id="text-7">
 <p>
 Scheme macros written with <code>syntax-rules</code> are hygienic.  This is also
@@ -2799,8 +2800,8 @@ number of concrete examples:
 </p>
 </div>
 
-<div id="outline-container-org58501e5" class="outline-3">
-<h3 id="org58501e5"><span class="section-number-3">7.1.</span> A classical loop macro</h3>
+<div id="outline-container-org020a5a3" class="outline-3">
+<h3 id="org020a5a3"><span class="section-number-3">7.1.</span> A classical loop macro</h3>
 <div class="outline-text-3" id="text-7-1">
 <p>
 A classical example for this is a <code>loop</code> macro that provides a loop
@@ -2973,8 +2974,8 @@ Let us test our example with this new version!
 </div>
 </div>
 
-<div id="outline-container-orgbf7b99b" class="outline-3">
-<h3 id="orgbf7b99b"><span class="section-number-3">7.2.</span> Convenience syntax to bind implicit identifiers</h3>
+<div id="outline-container-org727c9de" class="outline-3">
+<h3 id="org727c9de"><span class="section-number-3">7.2.</span> Convenience syntax to bind implicit identifiers</h3>
 <div class="outline-text-3" id="text-7-2">
 <p>
 Above, we used the <code>datum-&gt;syntax</code> procedure together with
@@ -3018,8 +3019,8 @@ With it, we can rewrite our <code>loop</code> macro as follows:
 </div>
 </div>
 
-<div id="outline-container-org82e2576" class="outline-3">
-<h3 id="org82e2576"><span class="section-number-3">7.3.</span> Definitions that make the bound name accessible</h3>
+<div id="outline-container-org2c645c6" class="outline-3">
+<h3 id="org2c645c6"><span class="section-number-3">7.3.</span> Definitions that make the bound name accessible</h3>
 <div class="outline-text-3" id="text-7-3">
 <p>
 For those who didn't like the <code>loop</code> example because it is mostly
@@ -3056,7 +3057,7 @@ Just a brief test:
 </pre>
 </div>
 
-<pre class="example" id="org03a48ff">
+<pre class="example" id="orgd9538b3">
 (3 2 1 4 5 6)
 </pre>
 
@@ -3131,8 +3132,8 @@ feature.
 </div>
 </div>
 
-<div id="outline-container-orgbab7b87" class="outline-3">
-<h3 id="orgbab7b87"><span class="section-number-3">7.4.</span> Definitions of constants</h3>
+<div id="outline-container-org2425df9" class="outline-3">
+<h3 id="org2425df9"><span class="section-number-3">7.4.</span> Definitions of constants</h3>
 <div class="outline-text-3" id="text-7-4">
 <p>
 In Scheme, we can use <code>define</code> to, well, define a variable.  This
@@ -3149,7 +3150,7 @@ pi
 </pre>
 </div>
 
-<pre class="example" id="org481dd82">
+<pre class="example" id="org828ffb5">
 3.14159
 </pre>
 
@@ -3226,7 +3227,7 @@ pi
 </pre>
 </div>
 
-<pre class="example" id="org37cf68f">
+<pre class="example" id="org5005e35">
 3.141592653589793
 </pre>
 
@@ -3262,7 +3263,7 @@ pi
 </pre>
 </div>
 
-<pre class="example" id="org0ec0983">
+<pre class="example" id="orgeaca1fa">
 3.141592653589793
 </pre>
 
@@ -3406,7 +3407,7 @@ expand-time and not at run-time.  Let us test it:
 </pre>
 </div>
 
-<pre class="example" id="orgd437b2a">
+<pre class="example" id="org7a9e60b">
 ((salmon . 16416882) (light-green . 9498256) (cornflower-blue . 6591981))
 </pre>
 
@@ -3415,14 +3416,14 @@ expand-time and not at run-time.  Let us test it:
 </pre>
 </div>
 
-<pre class="example" id="org18fbd49">
+<pre class="example" id="org921d2b2">
 6591981
 </pre>
 </div>
 </div>
 
-<div id="outline-container-orgc24df42" class="outline-3">
-<h3 id="orgc24df42"><span class="section-number-3">7.5.</span> A pitfall</h3>
+<div id="outline-container-org000b7fa" class="outline-3">
+<h3 id="org000b7fa"><span class="section-number-3">7.5.</span> A pitfall</h3>
 <div class="outline-text-3" id="text-7-5">
 <p>
 Although the macros <code>loop</code> and <code>define/who</code> defined above are
@@ -3462,7 +3463,7 @@ message when it is called:
 </pre>
 </div>
 
-<pre class="example" id="orgb9fa093">
+<pre class="example" id="org193bee2">
 log: entering procedure hello
 Hello!
 </pre>
@@ -3488,7 +3489,7 @@ refer to the procedure's name through the implicitly bound identifier
 </pre>
 </div>
 
-<pre class="example" id="org6baa530">
+<pre class="example" id="orgd3a8042">
 outer
 </pre>
 
@@ -3547,8 +3548,8 @@ problem of nested macro invocations described above.
 </div>
 </div>
 
-<div id="outline-container-org3e5fe8e" class="outline-2">
-<h2 id="org3e5fe8e"><span class="section-number-2">8.</span> Phasing</h2>
+<div id="outline-container-org85581d7" class="outline-2">
+<h2 id="org85581d7"><span class="section-number-2">8.</span> Phasing</h2>
 <div class="outline-text-2" id="text-8">
 <p>
 Phasing is an issue that is not specific to the particular macro
@@ -3564,8 +3565,8 @@ of the first library.
 </p>
 </div>
 
-<div id="outline-container-org206cb6b" class="outline-3">
-<h3 id="org206cb6b"><span class="section-number-3">8.1.</span> (Relative) phases</h3>
+<div id="outline-container-org4f580b4" class="outline-3">
+<h3 id="org4f580b4"><span class="section-number-3">8.1.</span> (Relative) phases</h3>
 <div class="outline-text-3" id="text-8-1">
 <p>
 When the expressions in a program or library are evaluated, the
@@ -3614,8 +3615,8 @@ of <code>bar</code> is evaluated at relative phase <i>n</i> + 2.
 </div>
 </div>
 
-<div id="outline-container-org8939f5d" class="outline-3">
-<h3 id="org8939f5d"><span class="section-number-3">8.2.</span> Identifier references at different phases</h3>
+<div id="outline-container-orgb7a52eb" class="outline-3">
+<h3 id="orgb7a52eb"><span class="section-number-3">8.2.</span> Identifier references at different phases</h3>
 <div class="outline-text-3" id="text-8-2">
 <p>
 A variable (an identifier bound to a location holding a value) can be
@@ -3680,8 +3681,8 @@ at any relative phase.
 </div>
 </div>
 
-<div id="outline-container-org1a3bf27" class="outline-2">
-<h2 id="org1a3bf27"><span class="section-number-2">9.</span> Extensions</h2>
+<div id="outline-container-org9d48857" class="outline-2">
+<h2 id="org9d48857"><span class="section-number-2">9.</span> Extensions</h2>
 <div class="outline-text-2" id="text-9">
 <p>
 In this section, we will describe three extensions to Scheme macro's
@@ -3691,8 +3692,8 @@ them.
 </p>
 </div>
 
-<div id="outline-container-org3d15ab3" class="outline-3">
-<h3 id="org3d15ab3"><span class="section-number-3">9.1.</span> Aliases</h3>
+<div id="outline-container-org0fd5875" class="outline-3">
+<h3 id="org0fd5875"><span class="section-number-3">9.1.</span> Aliases</h3>
 <div class="outline-text-3" id="text-9-1">
 <p>
 Given an identifier <code>x</code>, we may want to use it under a different name
@@ -3711,7 +3712,7 @@ like:
 </pre>
 </div>
 
-<pre class="example" id="org4906f1a">
+<pre class="example" id="orgce72631">
 new
 </pre>
 
@@ -3733,7 +3734,7 @@ following test:
 </pre>
 </div>
 
-<pre class="example" id="orge07bbae">
+<pre class="example" id="org15fb67f">
 #f
 </pre>
 
@@ -3758,7 +3759,7 @@ are allowed.  It arranges that <code>y</code> has the same binding as <code>x</c
 </pre>
 </div>
 
-<pre class="example" id="orgcdeebd2">
+<pre class="example" id="orgccb3668">
 (#t new)
 </pre>
 
@@ -3814,14 +3815,14 @@ Let us test our new version:
 </pre>
 </div>
 
-<pre class="example" id="org297d8f0">
+<pre class="example" id="org5243f80">
 return-who
 </pre>
 </div>
 </div>
 
-<div id="outline-container-org6dc84df" class="outline-3">
-<h3 id="org6dc84df"><span class="section-number-3">9.2.</span> Syntax parameters</h3>
+<div id="outline-container-orgcfe517e" class="outline-3">
+<h3 id="orgcfe517e"><span class="section-number-3">9.2.</span> Syntax parameters</h3>
 <div class="outline-text-3" id="text-9-2">
 <p>
 Syntax parameters, which are like aliases also described in a SRFI,
@@ -3851,7 +3852,7 @@ dynamic extent of the expansion of the body of <code>fluid-let-syntax</code>:
 </pre>
 </div>
 
-<pre class="example" id="org9b265fc">
+<pre class="example" id="orgd070ada">
 (inner outer)
 </pre>
 
@@ -3869,7 +3870,7 @@ Compare this to <code>let-syntax</code>:
 </pre>
 </div>
 
-<pre class="example" id="orgc8f6c58">
+<pre class="example" id="orgb6a6c27">
 (outer outer)
 </pre>
 
@@ -3910,7 +3911,7 @@ Let us test this new version:
 </pre>
 </div>
 
-<pre class="example" id="org92ff231">
+<pre class="example" id="orgb3f4c8a">
 0
 1
 2
@@ -3981,7 +3982,7 @@ The <code>define-integrable</code> keyword can be used as follows:
 </pre>
 </div>
 
-<pre class="example" id="orgd5f4bd2">
+<pre class="example" id="orgc0fcc31">
 (6 #t)
 </pre>
 
@@ -4000,8 +4001,8 @@ inlined.
 </div>
 </div>
 
-<div id="outline-container-orga53a194" class="outline-3">
-<h3 id="orga53a194"><span class="section-number-3">9.3.</span> Identifier properties</h3>
+<div id="outline-container-orgbf1d363" class="outline-3">
+<h3 id="orgbf1d363"><span class="section-number-3">9.3.</span> Identifier properties</h3>
 <div class="outline-text-3" id="text-9-3">
 <p>
 It is often the case that two different macros have to communicate.
@@ -4059,7 +4060,7 @@ its argument:
 </pre>
 </div>
 
-<pre class="example" id="orgcd05a71">
+<pre class="example" id="orge6d47bd">
 3
 </pre>
 
@@ -4088,7 +4089,7 @@ if there is none:
 </pre>
 </div>
 
-<pre class="example" id="org1cfe085">
+<pre class="example" id="orgae090e6">
 ("value" "no-value")
 </pre>
 
@@ -4198,7 +4199,7 @@ A typical use of a <code>for</code> loop can look like the following:
 </pre>
 </div>
 
-<pre class="example" id="org45152c7">
+<pre class="example" id="org945c8ed">
 (a 0)
 (b 1)
 (c 2)
@@ -4225,17 +4226,115 @@ sub-languages into Scheme.
 </div>
 </div>
 
-<div id="outline-container-orgcaac5ff" class="outline-2">
-<h2 id="orgcaac5ff"><span class="section-number-2">10.</span> Complex examples</h2>
+<div id="outline-container-org28a9422" class="outline-2">
+<h2 id="org28a9422"><span class="section-number-2">10.</span> Complex examples</h2>
 <div class="outline-text-2" id="text-10">
 </div>
-<div id="outline-container-org481ecf5" class="outline-3">
-<h3 id="org481ecf5"><span class="section-number-3">10.1.</span> <span class="todo TODO">TODO</span> An LR(1) parser generator implemented as a Scheme macro</h3>
+<div id="outline-container-orgfe7512d" class="outline-3">
+<h3 id="orgfe7512d"><span class="section-number-3">10.1.</span> An LR(1) parser generator implemented as a Scheme macro</h3>
+<div class="outline-text-3" id="text-10-1">
+<p>
+The power of Scheme's procedural macros enables us to stay within
+Scheme and within one Scheme process all the time.  Let us consider a
+parser generator like GNU Bison as a case study.  A classical parser
+generator is a separate executable that takes a grammar (for some
+formal language) interspersed with semantic actions and outputs source
+code implementing a parser for that language.
+</p>
+
+<p>
+The process is rather fragile as it depends a lot on text
+substitutions and the parser generator is ignorant about the embedded
+semantic code in the target language.  Moreover, an external tool is
+needed.
+</p>
+
+<p>
+In Scheme, on the other hand, we can write a macro that takes a
+grammar (described using Scheme's ordinary lexical syntax) and
+semantic expressions and replaces it at compile-time with the
+definition of a parser of this languages, obeying, among other
+things. the lexical scoping of the embedded semantic expressions.
+</p>
+
+<p>
+We have written such a macro that implements an LR(1)-parser generator
+in roughly 1000 lines to demonstrate a highly non-trivial macro (or
+sub-language).  The source code can be found in the <a href="https://github.com/mnieper/scheme-macros/blob/main/lib">library directory</a>
+of this tutorial's GitHub repository.
+</p>
+
+<p>
+It is written as an R6RS library, which we can readily import:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #a020f0;">import</span> (languages))
+</pre>
+</div>
+
+<p>
+The following gives an example of how a grammar together with semantic
+actions is defined:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(define-language (make-parser token token?)
+  (nonterminals exp term factor)
+  (terminals NUM <span style="color: #8b2252;">"+"</span> <span style="color: #8b2252;">"-"</span> <span style="color: #8b2252;">"*"</span> <span style="color: #8b2252;">"/"</span> <span style="color: #8b2252;">"("</span> <span style="color: #8b2252;">")"</span>)
+  (rules
+   [(exp -&gt; exp <span style="color: #8b2252;">"+"</span> term)
+    (+ exp term)]
+   [(exp -&gt; exp <span style="color: #8b2252;">"-"</span> term)
+    (- exp term)]
+   [(exp -&gt; term)]
+   [(term -&gt; term <span style="color: #8b2252;">"*"</span> factor)
+    (* term factor)]
+   [(term -&gt; term <span style="color: #8b2252;">"/"</span> factor)
+    (/ term factor)]
+   [(term -&gt; factor)]
+   [(factor -&gt; NUM)]
+   [(factor -&gt; <span style="color: #8b2252;">"("</span> exp <span style="color: #8b2252;">")"</span>)
+    exp])
+  (start exp))
+</pre>
+</div>
+
+<p>
+This definition binds <code>make-parser</code> to a thunk (a procedure taking no
+arguments) that when called returns a <i>parser</i> for the defined
+language.  A parser is a procedure.  Calling it with one value, a
+<i>token</i>, pushes this token in the parser.  Calling it with zero
+values, signals an end of the input and the procedure returns the
+semantic value of the sentences consisting of the token pushed so far.
+</p>
+
+<p>
+A convenience procedure <code>parse</code> is defined that pushes a fixed number
+of tokens and is used in the following example:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(parse (make-parser)
+       (token NUM 3)
+       (token <span style="color: #8b2252;">"+"</span>)
+       (token NUM 2)
+       (token <span style="color: #8b2252;">"*"</span>)
+       (token NUM 7)
+       (token <span style="color: #8b2252;">"-"</span>)
+       (token NUM 1))
+</pre>
+</div>
+
+<pre class="example" id="org0a06aa1">
+16
+</pre>
+</div>
 </div>
 </div>
 
-<div id="outline-container-orgcbf1b3f" class="outline-2">
-<h2 id="orgcbf1b3f"><span class="section-number-2">11.</span> Exercises</h2>
+<div id="outline-container-orgd9c6470" class="outline-2">
+<h2 id="orgd9c6470"><span class="section-number-2">11.</span> Exercises</h2>
 <div class="outline-text-2" id="text-11">
 <ol class="org-ol">
 <li>Write a macro <code>push!</code> such that <code>(push! list-variable expression)</code>
@@ -4271,6 +4370,13 @@ user-definable accumulators whose final result are returned by the
 <code>for</code> expression.</li>
 
 <li>Write a pattern matching Scheme macro.</li>
+
+<li>Make the parser generator more user friendly.  It should provide
+more information at compile-time when shift/reduce and
+reduce/reduce conflicts are reported and at run-time when syntax
+errors are reported.  Implement operator precedence and
+associativity rules to handle some shift/reduce and reduce/reduce
+conflicts automatically.</li>
 
 <li>Write a version of the lex scanner generator as a Scheme macro.</li>
 </ol>
@@ -4352,7 +4458,7 @@ it Clean with Syntax Parameters</a>.
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Marc Nieper-Wißkirchen</p>
-<p class="date">Created: 2023-03-03 Fri 19:39</p>
+<p class="date">Created: 2023-03-09 Thu 17:06</p>
 <p class="validation"><a href="https://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
 </body>

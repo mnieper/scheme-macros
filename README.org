@@ -3309,7 +3309,86 @@ sub-languages into Scheme.
 
 * Complex examples
 
-** TODO An LR(1) parser generator implemented as a Scheme macro
+** An LR(1) parser generator implemented as a Scheme macro
+
+The power of Scheme's procedural macros enables us to stay within
+Scheme and within one Scheme process all the time.  Let us consider a
+parser generator like GNU Bison as a case study.  A classical parser
+generator is a separate executable that takes a grammar (for some
+formal language) interspersed with semantic actions and outputs source
+code implementing a parser for that language.
+
+The process is rather fragile as it depends a lot on text
+substitutions and the parser generator is ignorant about the embedded
+semantic code in the target language.  Moreover, an external tool is
+needed.
+
+In Scheme, on the other hand, we can write a macro that takes a
+grammar (described using Scheme's ordinary lexical syntax) and
+semantic expressions and replaces it at compile-time with the
+definition of a parser of this languages, obeying, among other
+things. the lexical scoping of the embedded semantic expressions.
+
+We have written such a macro that implements an LR(1)-parser generator
+in roughly 1000 lines to demonstrate a highly non-trivial macro (or
+sub-language).  The source code can be found in the [[https://github.com/mnieper/scheme-macros/blob/main/lib][library directory]]
+of this tutorial's GitHub repository.
+
+It is written as an R6RS library, which we can readily import:
+
+#+BEGIN_SRC scheme :results silent
+  (import (languages))
+#+END_SRC
+
+The following gives an example of how a grammar together with semantic
+actions is defined:
+
+#+BEGIN_SRC scheme :results silent
+  (define-language (make-parser token token?)
+    (nonterminals exp term factor)
+    (terminals NUM "+" "-" "*" "/" "(" ")")
+    (rules
+     [(exp -> exp "+" term)
+      (+ exp term)]
+     [(exp -> exp "-" term)
+      (- exp term)]
+     [(exp -> term)]
+     [(term -> term "*" factor)
+      (* term factor)]
+     [(term -> term "/" factor)
+      (/ term factor)]
+     [(term -> factor)]
+     [(factor -> NUM)]
+     [(factor -> "(" exp ")")
+      exp])
+    (start exp))
+#+END_SRC
+
+This definition binds ~make-parser~ to a thunk (a procedure taking no
+arguments) that when called returns a /parser/ for the defined
+language.  A parser is a procedure.  Calling it with one value, a
+/token/, pushes this token in the parser.  Calling it with zero
+values, signals an end of the input and the procedure returns the
+semantic value of the sentences consisting of the token pushed so far.
+
+A convenience procedure ~parse~ is defined that pushes a fixed number
+of tokens and is used in the following example:
+
+#+BEGIN_SRC scheme :results scalar :exports both :wrap example
+  (parse (make-parser)
+         (token NUM 3)
+         (token "+")
+         (token NUM 2)
+         (token "*")
+         (token NUM 7)
+         (token "-")
+         (token NUM 1))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+16
+#+end_example
 
 * Exercises
 
@@ -3347,7 +3426,14 @@ sub-languages into Scheme.
 
 9. Write a pattern matching Scheme macro.
 
-10. Write a version of the lex scanner generator as a Scheme macro.
+10. Make the parser generator more user friendly.  It should provide
+    more information at compile-time when shift/reduce and
+    reduce/reduce conflicts are reported and at run-time when syntax
+    errors are reported.  Implement operator precedence and
+    associativity rules to handle some shift/reduce and reduce/reduce
+    conflicts automatically.
+
+11. Write a version of the lex scanner generator as a Scheme macro.
 
 * Footnotes
 [fn:11]In-depth advanced information can be found in the paper [[http://scheme2011.ucombinator.org/papers/Barzilay2011.pdf][Keeping
