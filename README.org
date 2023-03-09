@@ -3406,34 +3406,38 @@ of tokens and is used in the following example:
    ... )~ expands into a literal expression of the form ~'((key1
    value1) (key2 value2) ...)~.
 
-4. Write a macro ~timestamp~ such that ~timestamp~ expands into a
+4. Let ~x~ be a pattern variable that represents a list of syntax
+   objects and ~y~ a pattern variable that represents a list of lists
+   of syntax objects.  Find out the result of ~#'(((x y) ...) ...)~.
+
+5. Write a macro ~timestamp~ such that ~timestamp~ expands into a
    number literal counting the number of uses of ~timestamp~.
 
-5. Rewrite ~fluid-let~ as a recursive macro that does not use
+6. Rewrite ~fluid-let~ as a recursive macro that does not use
    ~generate-temporaries~.
 
-6. Write a procedure ~symbolic-identifier=?~ so that
+7. Write a procedure ~symbolic-identifier=?~ so that
    ~(symbolic-identifier=? id1 id2)~ returns ~#t~ if and only if the
    two identifiers ~id1~ and ~id2~ have the same symbolic name.
 
-7. Extend the ~loop~ macro so that evaluating ~(continue)~ skips the
+8. Extend the ~loop~ macro so that evaluating ~(continue)~ skips the
    rest of the current loop iteration and the loop continues with the
    next iteration.
 
-8. Modify the ~for~ macro into a functional form supporting
+9. Modify the ~for~ macro into a functional form supporting
    user-definable accumulators whose final result are returned by the
    ~for~ expression.
 
-9. Write a pattern matching Scheme macro.
+10. Write a pattern matching Scheme macro.
 
-10. Make the parser generator more user friendly.  It should provide
+11. Make the parser generator more user friendly.  It should provide
     more information at compile-time when shift/reduce and
     reduce/reduce conflicts are reported and at run-time when syntax
     errors are reported.  Implement operator precedence and
     associativity rules to handle some shift/reduce and reduce/reduce
     conflicts automatically.
 
-11. Write a version of the lex scanner generator as a Scheme macro.
+12. Write a version of the lex scanner generator as a Scheme macro.
 
 * Footnotes
 
