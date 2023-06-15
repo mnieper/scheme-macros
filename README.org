@@ -1364,7 +1364,7 @@ us first define a macro transformer that uses ~syntax-case~:
     (lambda (stx)
       (syntax-case stx ()
         [(_ x ...)
-         (list #'quote (list (length #'(x ...)) #'(x ...)))])))
+         (list #'quote (append (list (length #'(x ...))) #'(x ...)))])))
 #+END_SRC
 
 We can test this procedure as any other procedure:
@@ -1375,7 +1375,7 @@ We can test this procedure as any other procedure:
 
 #+RESULTS:
 #+begin_example
-(#<syntax quote> (3 (#<syntax a> #<syntax b> #<syntax c>)))
+(#<syntax quote> (3 #<syntax a> #<syntax b> #<syntax c>))
 #+end_example
 
 The output is thus a syntax object of the form ~(quote (n x ...))~
