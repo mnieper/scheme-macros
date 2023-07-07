@@ -1699,7 +1699,7 @@ With this tool at our disposal, we can finally write a version of
                  swap!
                  (lambda ()
                    b1 ... b2)
-                 swap!))]))))
+                 swap!)))])))
 #+END_SRC
 
 #+BEGIN_SRC scheme :results output :export both :wrap example
