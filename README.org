@@ -679,7 +679,7 @@ hood.
 ** Identifiers
 
 The Lisp languages, and thus Scheme as well, are homoiconic
-programming languages, which means that if the program's internal
+programming languages, which means that the program's internal
 representation is a datum of the language.  In first approximation,
 the internal representation of a Scheme expression (as of a Scheme
 program) is a Scheme datum value.  For example, the program
@@ -722,7 +722,7 @@ symbolic name and a lexical context are associated.  When the binding
 of an identifier is looked up, it is looked up in the lexical context
 associated with it.
 
-In Scheme, symbols are first-class values.  The can be created using
+In Scheme, symbols are first-class values. Symbols can be created using
 the syntax ~(quote name)~, which can be abbreviated to ~'name~:
 
 #+BEGIN_SRC scheme :results scalar :exports both :wrap example
