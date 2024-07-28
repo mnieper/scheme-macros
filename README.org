@@ -679,7 +679,7 @@ hood.
 ** Identifiers
 
 The Lisp languages, and thus Scheme as well, are homoiconic
-programming languages, which means that if the program's internal
+programming languages, which means that the program's internal
 representation is a datum of the language.  In first approximation,
 the internal representation of a Scheme expression (as of a Scheme
 program) is a Scheme datum value.  For example, the program
