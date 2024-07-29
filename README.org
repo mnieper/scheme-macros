@@ -661,7 +661,7 @@ macros as follows:
 
 - If a macro transformer inserts a binding for an identifier (variable
   or keyword) not appearing in the macro use, the identifier is in
-  effect rename throughout its scope to avoid conflicts with other
+  effect renamed throughout its scope to avoid conflicts with other
   identifiers.
 
 - If a macro transformer inserts a free reference to an identifier,
