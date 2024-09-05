@@ -722,7 +722,7 @@ symbolic name and a lexical context are associated.  When the binding
 of an identifier is looked up, it is looked up in the lexical context
 associated with it.
 
-In Scheme, symbols are first-class values.  The can be created using
+In Scheme, symbols are first-class values. Symbols can be created using
 the syntax ~(quote name)~, which can be abbreviated to ~'name~:
 
 #+BEGIN_SRC scheme :results scalar :exports both :wrap example
